@@ -1,0 +1,207 @@
+<html>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <head>
+        <title>
+            Zero-Trust Microservice Application
+        </title>
+    </head>
+<body style="background-image: url({{ url_for('static', filename='images/backdrop.png') }});background-size: 100% 100%; background-repeat: no-repeat;">
+    <table border="3" >
+        <h1 style="color:honeydew;">
+           ZeroTrust Cat Viewer Portal
+        </h1>
+        <h2 style=color:aliceblue>
+            ECS Fargate Portal Tier
+        </h2>
+        <tr>
+            <th style="background-color: aliceblue; text-align: left; color: rgb(255, 20, 20);">Your Portal Connection</th>
+            <th style="background-color: aliceblue; text-align: left; color: rgb(255, 20, 20);">Your Portal Identity</th>
+            <th style="background-color: aliceblue; text-align: left; color: rgb(255, 20, 20);">Your Portal Requests</th>
+        </tr>
+        <tr>
+            <td>
+                <img src="{{render['portaltype']}}" alt="Portal Connection">
+            </td>
+            <td>
+                <img src="{{render['portalid']}}" alt="Portal Identification">
+            </td>
+            <td style="background-color: rgb(241, 147, 241);">
+                <table>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 100px ">Request URI</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; min-width: 700px ;max-width: 700px ">{{request.url}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 100px ">Request Principal</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; min-width: 700px ;max-width: 700px">{{render.portalidname}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 100px ">PortalMessage</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; min-width: 700px ;max-width: 700px ">{{render.portalmessage}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 100px ">Portal Information</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; min-width: 700px ;max-width: 700px ">{{render.portalinformation}}</th></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <table>
+            <tr>
+                <td>
+                    <form action="/" method="GET">
+                        <input type="submit" value="-- RESET --">
+                    </form>
+                </td>     
+                <td>
+                    <form action="/run" method="POST">
+                        <input type="submit" name="status" value="-- RUN ME --">
+                    </form>
+                </td>
+            </tr>
+        </table>
+
+    </table >
+    <table border="3" >
+        <h2 style=color:aliceblue>
+            Elastic Container Service Tier (mservice1)
+        </h2>
+        <tr>
+            <th style="background-color: bisque; color: rgb(255, 20, 20);">Less Secure Connection</th>
+            <th style="background-color: aquamarine; color: darkorange;">More Secure Connection</th>
+        </tr>
+        <tr>
+            <td>
+                <img src="{{render['app1img']}}" alt="Less Secure"></td>
+            <td>
+                <img src="{{render['app1secimg']}}" alt="More Secure"></td>
+        </tr>
+        <tr>
+            <td style="background-color: rgb(241, 147, 241);">
+                <table>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Request URI</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1url']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 1 Message</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1message']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 1 Information</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1information']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">Request Headers</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word;">{{render['app1headers']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Status Code</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1status']}}</th></td>
+                    </tr>
+                </table>
+            </td>
+            <td style="background-color: rgb(241, 147, 241);">
+                <table>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Request URI</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1securl']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 1 Sec Message</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1secmessage']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 1 Sec Information</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1secinformation']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 1 Sec Details</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1secdetails']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">Request Headers</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word;">{{render['app1secheaders']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Status Code</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app1secstatus']}}</th></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table >
+
+    <table border="3" >
+        <h2 style=color:aliceblue>
+            LAMBDA Function Tier (mservice2)
+        </h2>
+        <tr>
+            <th style="background-color: bisque; color: rgb(255, 20, 20);">Less Secure Connection</th>
+            <th style="background-color: aquamarine; color: darkorange;">More Secure Connection</th>
+        </tr>
+        <tr>
+            <td>
+                <img src="{{render['app2img']}}" alt="Less Secure"></td>
+            <td>
+                <img src="{{render['app2secimg']}}" alt="More Secure"></td>
+        </tr>
+        <tr>
+            <td style="background-color: rgb(241, 147, 241);">
+                <table>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Request URI</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2url']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 2 Message</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2message']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 2 Information</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2information']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">Request Headers</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word;">{{render['app2headers']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Status Code</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2status']}}</th></td>
+                    </tr>
+                </table>
+            </td>
+            <td style="background-color: rgb(241, 147, 241);">
+                <table>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Request URI</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2securl']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 2 Sec Message</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2secmessage']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 2 Sec Information</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2secinformation']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">App 2 Sec Details</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2secdetails']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px">Request Headers</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word;">{{render['app2secheaders']}}</th></td>
+                    </tr>
+                    <tr>
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 125px;">Status Code</th></td>     
+                        <td><th style="background-color: aliceblue; text-align: left; max-width: 465px; word-wrap: break-word">{{render['app2secstatus']}}</th></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table >
+
+</body>
+
+</html>
