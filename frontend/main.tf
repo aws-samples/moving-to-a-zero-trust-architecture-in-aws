@@ -1,5 +1,19 @@
 # ---------- frontend/main.tf ----------
 
+data "aws_region" "current" {}
+
+# ---------- VPC LATTICE VPC ASSOCIATION ---------
+# module "vpclattice_frontendvpc_sn_assoc" {
+#   source  = "aws-ia/amazon-vpc-lattice-module/aws"
+#   version = "0.0.3"
+
+#   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
+
+#   vpc_associations = {
+#     frontend_vpc = { vpc_id = module.frontend_vpc.vpc_attributes.id }
+#   }
+# }
+
 # ---------- FRONTEND VPC ----------
 module "frontend_vpc" {
   source  = "aws-ia/vpc/aws"
@@ -13,7 +27,7 @@ module "frontend_vpc" {
 
   transit_gateway_id = module.retrieve_parameters.parameter.transit_gateway
   transit_gateway_routes = {
-    workload = "10.0.0.0/8"
+    application = "10.0.0.0/8"
   }
 
   subnets = {
@@ -22,12 +36,11 @@ module "frontend_vpc" {
       nat_gateway_configuration = "all_azs"
     }
     private = { netmask = 24 }
-    workload = {
+    application = {
       netmask                 = 24
       connect_to_public_natgw = true
     }
-    endpoints = { netmask = 28
-    }
+    endpoints       = { netmask = 28 }
     transit_gateway = { netmask = 28 }
   }
 }
@@ -38,7 +51,7 @@ resource "aws_route53_zone_association" "frontend_vpc_association" {
   vpc_id  = module.frontend_vpc.vpc_attributes.id
 }
 
-# Getting CIDR block allocated to the VPC (to provide DNS server to the Client VPN endpoint)
+# Getting CIDR block allocated to the VPC
 data "aws_vpc" "vpc" {
   id = module.frontend_vpc.vpc_attributes.id
 }
@@ -118,7 +131,7 @@ resource "aws_verifiedaccess_group" "ava_group" {
   policy_document = <<EOT
 permit(principal,action,resource)
 when {
-    context.frontenduser.groups has "22858464-f051-706d-5718-9115ccd25a1e"
+    context.frontenduser.groups has "${var.idc_group_id}"
 };
 EOT
 
@@ -133,9 +146,9 @@ resource "aws_verifiedaccess_endpoint" "ava_endpoint" {
   description              = "App Frontend"
   verified_access_group_id = aws_verifiedaccess_group.ava_group.id
 
-  application_domain     = "app.frontend.pablosc.people.aws.dev"
+  application_domain     = var.frontend_domain_name
   domain_certificate_arn = var.certificate_arn
-  endpoint_domain_prefix = ""
+  endpoint_domain_prefix = "frontend"
 
   attachment_type    = "vpc"
   endpoint_type      = "load-balancer"
@@ -145,11 +158,11 @@ resource "aws_verifiedaccess_endpoint" "ava_endpoint" {
     load_balancer_arn = aws_lb.lb.arn
     port              = 443
     protocol          = "https"
-    subnet_ids        = values({ for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "workload" })
+    subnet_ids        = values({ for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "private" })
   }
 
   tags = {
-    Name = "app.frontend.pablosc.people.aws.dev"
+    Name = "App Frontend"
   }
 }
 
@@ -169,23 +182,11 @@ resource "aws_vpc_security_group_ingress_rule" "allowing_ingress_https" {
   cidr_ipv4   = "0.0.0.0/0"
 }
 
-resource "aws_vpc_security_group_egress_rule" "allowing_ava_egress" {
+resource "aws_vpc_security_group_egress_rule" "allowing_ava_alb_connectivity" {
   security_group_id = aws_security_group.ava_sg.id
 
   ip_protocol = "-1"
-  cidr_ipv4   = "0.0.0.0/0"
-}
-
-# ---------- VPC LATTICE VPC ASSOCIATION ---------
-module "vpclattice_frontendvpc_sn_assoc" {
-  source  = "aws-ia/amazon-vpc-lattice-module/aws"
-  version = "0.0.3"
-
-  service_network = { identifier = module.retrieve_parameters.parameter.service_network }
-
-  vpc_associations = {
-    frontend_vpc = { vpc_id = module.frontend_vpc.vpc_attributes.id }
-  }
+  cidr_ipv4   = data.aws_vpc.vpc.cidr_block
 }
 
 # ---------- FRONTEND APPLICATION ----------
@@ -195,7 +196,7 @@ resource "aws_lb" "lb" {
   internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb_sg.id]
-  subnets            = values({ for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "workload" })
+  subnets            = values({ for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "private" })
   ip_address_type    = "ipv4"
 }
 
@@ -235,14 +236,14 @@ resource "aws_vpc_security_group_ingress_rule" "allowing_ingress_alb_https" {
   from_port   = 443
   to_port     = 443
   ip_protocol = "tcp"
-  cidr_ipv4   = "0.0.0.0/0"
+  cidr_ipv4   = data.aws_vpc.vpc.cidr_block
 }
 
 resource "aws_vpc_security_group_egress_rule" "allowing_alb_health_check" {
   security_group_id = aws_security_group.alb_sg.id
 
   ip_protocol = "-1"
-  cidr_ipv4   = "0.0.0.0/0"
+  cidr_ipv4   = data.aws_vpc.vpc.cidr_block
 }
 
 # ECR respository
@@ -259,10 +260,6 @@ resource "aws_ecs_cluster" "frontend_cluster" {
       logging = "DEFAULT"
     }
   }
-
-  service_connect_defaults {
-    namespace = "arn:aws:servicediscovery:eu-west-1:471112834120:namespace/ns-ovswnkdt64vmtffa"
-  }
 }
 
 resource "aws_ecs_cluster_capacity_providers" "cluster_capacity_provider" {
@@ -275,10 +272,9 @@ resource "aws_ecs_service" "frontend_service" {
   cluster             = aws_ecs_cluster.frontend_cluster.arn
   name                = "frontend"
   platform_version    = "LATEST"
-  task_definition     = "frontend:2"
+  task_definition     = split("/", aws_ecs_task_definition.frontend_task_definition.arn)[1]
   scheduling_strategy = "REPLICA"
   propagate_tags      = "NONE"
-  iam_role            = "/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
 
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100
@@ -306,30 +302,40 @@ resource "aws_ecs_service" "frontend_service" {
   network_configuration {
     assign_public_ip = false
     security_groups  = [aws_security_group.ecs_service_sg.id]
-    subnets          = values({ for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "workload" })
+    subnets          = values({ for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "application" })
   }
 }
 
 # ECS Task Definition
 resource "aws_ecs_task_definition" "frontend_task_definition" {
+  cpu                      = 1024
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  family                   = "frontend"
+  memory                   = 3072
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
+  runtime_platform {
+    cpu_architecture        = "X86_64"
+    operating_system_family = "LINUX"
+  }
+
   container_definitions = jsonencode([{
-    cpu              = 0
-    environment      = []
-    environmentFiles = []
-    essential        = true
-    image            = "${aws_ecr_repository.repository.repository_url}:latest"
+    name      = "frontend"
+    image     = "${aws_ecr_repository.repository.repository_url}:latest"
+    essential = true
+
     logConfiguration = {
-      logDriver     = "awslogs"
-      secretOptions = []
+      logDriver = "awslogs"
       options = {
         awslogs-create-group  = "true"
         awslogs-group         = "/ecs/frontend"
-        awslogs-region        = "eu-west-1"
+        awslogs-region        = data.aws_region.current.name
         awslogs-stream-prefix = "ecs"
       }
     }
-    mountPoints = []
-    name        = "frontend"
+
     portMappings = [{
       appProtocol   = "http"
       containerPort = 8080
@@ -337,21 +343,7 @@ resource "aws_ecs_task_definition" "frontend_task_definition" {
       name          = "frontend-8080-tcp"
       protocol      = "tcp"
     }]
-    systemControls = []
-    ulimits        = []
-    volumesFrom    = []
   }])
-  cpu                      = 1024
-  execution_role_arn       = "arn:aws:iam::471112834120:role/ecsTaskExecutionRole"
-  family                   = "frontend"
-  memory                   = 3072
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  task_role_arn            = "arn:aws:iam::471112834120:role/frontend"
-  runtime_platform {
-    cpu_architecture        = "ARM64"
-    operating_system_family = "LINUX"
-  }
 }
 
 # Security Group (ECS Service)
@@ -364,15 +356,10 @@ resource "aws_security_group" "ecs_service_sg" {
 resource "aws_vpc_security_group_ingress_rule" "ingress_ipv4" {
   security_group_id = aws_security_group.ecs_service_sg.id
 
-  ip_protocol = "-1"
-  cidr_ipv4   = "0.0.0.0/0"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "ingress_ipv6" {
-  security_group_id = aws_security_group.ecs_service_sg.id
-
-  ip_protocol = "-1"
-  cidr_ipv6   = "::/0"
+  ip_protocol = "tcp"
+  from_port   = 8080
+  to_port     = 8080
+  cidr_ipv4   = data.aws_vpc.vpc.cidr_block
 }
 
 resource "aws_vpc_security_group_egress_rule" "egress_ipv4" {
@@ -392,6 +379,8 @@ module "share_parameters" {
       vpc_id                        = module.frontend_vpc.vpc_attributes.id
       transit_gateway_attachment_id = module.frontend_vpc.transit_gateway_attachment_id
     })
+    frontend_ava_domain_name = aws_verifiedaccess_endpoint.ava_endpoint.endpoint_domain
+    frontent_alb_domain_name = aws_lb.lb.dns_name
   }
 }
 
@@ -403,6 +392,6 @@ module "retrieve_parameters" {
     transit_gateway     = var.networking_account
     ipam_frontend       = var.networking_account
     private_hosted_zone = var.networking_account
-    service_network     = var.networking_account
+    #service_network     = var.networking_account
   }
 }

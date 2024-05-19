@@ -1,100 +1,150 @@
 # ---------- frontend/main.tf ----------
 
+data "aws_region" "current" {}
+
 # ---------- VPC LATTICE CONFIGURATION ---------
-# Backend VPC 1 & Backend Service 1 association
-module "vpclattice_backend1vpc" {
-  source  = "aws-ia/amazon-vpc-lattice-module/aws"
-  version = "0.0.3"
+# # Service 1
+# module "vpclattice_service1" {
+#   source  = "aws-ia/amazon-vpc-lattice-module/aws"
+#   version = "0.0.3"
 
-  service_network = { identifier = module.retrieve_parameters.parameter.service_network }
+#   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
 
-  vpc_associations = {
-    backend_vpc = { vpc_id = module.backend1_vpc.vpc_attributes.id }
-  }
+#   vpc_associations = {
+#     backend1_vpc = { vpc_id = module.backend1_vpc.vpc_attributes.id }
+#   }
 
-  services = {
-    mservice1 = {
-      name      = "mservice1"
-      auth_type = "NONE"
-      #auth_policy = 
-      certificate_arn    = var.certificate_arn
-      custom_domain_name = "mservice1.backend.pablosc.people.aws.dev"
+#   services = {
+#     mservice1 = {
+#       name               = "mservice1"
+#       auth_type          = "NONE" #"AWS_IAM"
+#       certificate_arn    = var.certificate_arn
+#       custom_domain_name = var.backend_service1_domain_name
 
-      listeners = {
-        https_listener = {
-          name     = "https-443"
-          port     = 443
-          protocol = "HTTPS"
-          default_action_forward = {
-            target_groups = {
-              albtarget = { weight = 1 }
-            }
-          }
-        }
-      }
-    }
-  }
+#       listeners = {
+#         https_listener = {
+#           name     = "https-443"
+#           port     = 443
+#           protocol = "HTTPS"
+#           default_action_forward = {
+#             target_groups = {
+#               albtarget = { weight = 1 }
+#             }
+#           }
+#         }
+#       }
+#     }
+#   }
 
-  target_groups = {
-    albtarget = {
-      name = "mservice1"
-      type = "ALB"
+#   target_groups = {
+#     albtarget = {
+#       name = "mservice1"
+#       type = "ALB"
 
-      config = {
-        port           = 443
-        protocol       = "HTTPS"
-        vpc_identifier = module.backend1_vpc.vpc_attributes.id
-      }
+#       config = {
+#         port           = 443
+#         protocol       = "HTTPS"
+#         vpc_identifier = module.backend1_vpc.vpc_attributes.id
+#       }
 
-      targets = {
-        albtarget = {
-          id   = aws_lb.backend1_lb.arn
-          port = 443
-        }
-      }
-    }
-  }
-}
+#       targets = {
+#         albtarget = {
+#           id   = aws_lb.backend1_lb.arn
+#           port = 443
+#         }
+#       }
+#     }
+#   }
+# }
 
-# Backend Service 2 association
-module "vpclattice_backend2" {
-  source  = "aws-ia/amazon-vpc-lattice-module/aws"
-  version = "0.0.3"
+# # resource "aws_vpclattice_auth_policy" "service1_auth_policy" {
+# #   resource_identifier = module.vpclattice_service1.services.mservice1.attributes.arn
+# #   policy              = local.service1_policy
+# # }
 
-  service_network = { identifier = module.retrieve_parameters.parameter.service_network }
+# # Service 2
+# module "vpclattice_service2" {
+#   source  = "aws-ia/amazon-vpc-lattice-module/aws"
+#   version = "0.0.3"
 
-  services = {
-    mservice1 = {
-      name      = "mservice2"
-      auth_type = "NONE"
-      #auth_policy = 
-      certificate_arn    = var.certificate_arn
-      custom_domain_name = "mservice2.backend.pablosc.people.aws.dev"
+#   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
 
-      listeners = {
-        https_listener = {
-          name     = "https-443"
-          port     = 443
-          protocol = "HTTPS"
-          default_action_forward = {
-            target_groups = {
-              lambdatarget = { weight = 1 }
-            }
-          }
-        }
-      }
-    }
-  }
+#   services = {
+#     mservice2 = {
+#       name               = "mservice2"
+#       auth_type          = "NONE" #"AWS_IAM"
+#       certificate_arn    = var.certificate_arn
+#       custom_domain_name = var.backend_service2_domain_name
 
-  target_groups = {
-    lambdatarget = {
-      name = "mservice2"
-      type = "LAMBDA"
+#       # listeners = {
+#       #   https_listener = {
+#       #     name = "https-443"
+#       #     port = 443
+#       #     protocol = "HTTPS"
+#       #     default_action_forward = {
+#       #       target_groups = {
+#       #         lambdatarget = { weight = 1 }
+#       #       }
+#       #     }
+#       #   }
+#       # }
+#     }
+#   }
 
-      targets = { lambda = { id = aws_lambda_function.backend2_function.arn } }
-    }
-  }
-}
+#   # target_groups = {
+#   #   lambdatarget = {
+#   #     name = "mservice2"
+#   #     type = "LAMBDA"
+
+#   #     targets = { lamdba = { id = aws_lambda_function.backend2_function.arn }}
+#   #   }
+#   # }
+# }
+
+# # resource "aws_vpclattice_auth_policy" "service2_auth_policy" {
+# #   resource_identifier = module.vpclattice_service2.services.mservice2.attributes.arn
+# #   policy              = local.service2_policy
+# # }
+
+# # TEMP: VPC LATTICE LAMBDA TARGET GROUP AND TARGET
+# resource "aws_vpclattice_listener" "vpclattice_service2_listener" {
+#   name               = "https-443"
+#   protocol           = "HTTPS"
+#   port               = 443
+#   service_identifier = module.vpclattice_service2.services.mservice2.attributes.arn
+#   default_action {
+#     forward {
+#       target_groups {
+#         target_group_identifier = aws_vpclattice_target_group.vpclattice_target_group_lambda.arn
+#       }
+#     }
+#   }
+# }
+
+# resource "aws_vpclattice_target_group" "vpclattice_target_group_lambda" {
+#   name = "mservice2"
+#   type = "LAMBDA"
+
+#   config {
+#     lambda_event_structure_version = "V2"
+#   }
+# }
+
+# resource "aws_vpclattice_target_group_attachment" "vpclattice_target_attachment_lambda" {
+#   target_group_identifier = aws_vpclattice_target_group.vpclattice_target_group_lambda.arn
+
+#   target {
+#     id = aws_lambda_function.backend2_function.arn
+#   }
+# }
+
+# resource "aws_lambda_permission" "lambda_target_vpclattice" {
+#   statement_id  = "AllowExecutionFromVpcLattice"
+#   action        = "lambda:InvokeFunction"
+#   function_name = aws_lambda_function.backend2_function.function_name
+#   principal     = "vpc-lattice.amazonaws.com"
+#   source_arn    = aws_vpclattice_target_group.vpclattice_target_group_lambda.arn
+# }
 
 # ---------- BACKEND VPC (1) ----------
 module "backend1_vpc" {
@@ -109,8 +159,8 @@ module "backend1_vpc" {
 
   transit_gateway_id = module.retrieve_parameters.parameter.transit_gateway
   transit_gateway_routes = {
-    private  = "10.0.0.0/8"
-    workload = "10.0.0.0/8"
+    private     = "10.0.0.0/8"
+    application = "10.0.0.0/8"
   }
 
   subnets = {
@@ -119,7 +169,7 @@ module "backend1_vpc" {
       nat_gateway_configuration = "all_azs"
     }
     private = { netmask = 24 }
-    workload = {
+    application = {
       netmask                 = 24
       connect_to_public_natgw = true
     }
@@ -134,6 +184,11 @@ resource "aws_route53_zone_association" "backend1_vpc_association" {
   vpc_id  = module.backend1_vpc.vpc_attributes.id
 }
 
+# Getting CIDR block allocated to the VPC
+data "aws_vpc" "backend1_vpc" {
+  id = module.backend1_vpc.vpc_attributes.id
+}
+
 # ---------- BACKEND APPLICATION 1 ----------
 # Application Load Balancer
 resource "aws_lb" "backend1_lb" {
@@ -141,7 +196,7 @@ resource "aws_lb" "backend1_lb" {
   internal           = true
   load_balancer_type = "application"
   security_groups    = [aws_security_group.backend1_alb_sg.id]
-  subnets            = values({ for k, v in module.backend1_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "workload" })
+  subnets            = values({ for k, v in module.backend1_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "private" })
   ip_address_type    = "ipv4"
 }
 
@@ -164,7 +219,6 @@ resource "aws_lb_listener" "backend1_listener" {
   default_action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.backend1_target_group.arn
-
   }
 }
 
@@ -188,7 +242,7 @@ resource "aws_vpc_security_group_egress_rule" "backend1_allowing_alb_health_chec
   security_group_id = aws_security_group.backend1_alb_sg.id
 
   ip_protocol = "-1"
-  cidr_ipv4   = "0.0.0.0/0"
+  cidr_ipv4   = data.aws_vpc.backend1_vpc.cidr_block
 }
 
 # ECR respository
@@ -205,10 +259,6 @@ resource "aws_ecs_cluster" "backend1_cluster" {
       logging = "DEFAULT"
     }
   }
-
-  service_connect_defaults {
-    namespace = "arn:aws:servicediscovery:eu-west-1:992382807606:namespace/ns-am4q2r72hxxjv3jr"
-  }
 }
 
 resource "aws_ecs_cluster_capacity_providers" "cluster_capacity_provider" {
@@ -221,10 +271,9 @@ resource "aws_ecs_service" "backend1_service" {
   cluster             = aws_ecs_cluster.backend1_cluster.arn
   name                = "mservice1"
   platform_version    = "LATEST"
-  task_definition     = "mservice1:1"
+  task_definition     = split("/", aws_ecs_task_definition.backend1_task_definition.arn)[1]
   scheduling_strategy = "REPLICA"
   propagate_tags      = "NONE"
-  iam_role            = "/aws-service-role/ecs.amazonaws.com/AWSServiceRoleForECS"
 
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100
@@ -252,30 +301,35 @@ resource "aws_ecs_service" "backend1_service" {
   network_configuration {
     assign_public_ip = false
     security_groups  = [aws_security_group.backend1_ecs_service_sg.id]
-    subnets          = values({ for k, v in module.backend1_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "workload" })
+    subnets          = values({ for k, v in module.backend1_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "application" })
   }
 }
 
 # ECS Task Definition
 resource "aws_ecs_task_definition" "backend1_task_definition" {
+  family                   = "mservice1"
+  cpu                      = 1024
+  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  memory                   = 3072
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
+
   container_definitions = jsonencode([{
-    cpu              = 0
-    environment      = []
-    environmentFiles = []
-    essential        = true
-    image            = "${aws_ecr_repository.repository.repository_url}:latest"
+    name      = "mservice1"
+    image     = "${aws_ecr_repository.repository.repository_url}:latest"
+    essential = true
+
     logConfiguration = {
-      logDriver     = "awslogs"
-      secretOptions = []
+      logDriver = "awslogs"
       options = {
         awslogs-create-group  = "true"
         awslogs-group         = "/ecs/mservice1"
-        awslogs-region        = "eu-west-1"
+        awslogs-region        = data.aws_region.current.name
         awslogs-stream-prefix = "ecs"
       }
     }
-    mountPoints = []
-    name        = "mservice1"
+
     portMappings = [{
       appProtocol   = "http"
       containerPort = 8081
@@ -283,19 +337,10 @@ resource "aws_ecs_task_definition" "backend1_task_definition" {
       name          = "mservice1-8081-tcp"
       protocol      = "tcp"
     }]
-    systemControls = []
-    ulimits        = []
-    volumesFrom    = []
   }])
-  cpu                      = 1024
-  execution_role_arn       = "arn:aws:iam::992382807606:role/ecsTaskExecutionRole"
-  family                   = "mservice1"
-  memory                   = 3072
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  task_role_arn            = "arn:aws:iam::992382807606:role/mservice1"
+
   runtime_platform {
-    cpu_architecture        = "ARM64"
+    cpu_architecture        = "X86_64"
     operating_system_family = "LINUX"
   }
 }
@@ -310,15 +355,10 @@ resource "aws_security_group" "backend1_ecs_service_sg" {
 resource "aws_vpc_security_group_ingress_rule" "ingress_ipv4" {
   security_group_id = aws_security_group.backend1_ecs_service_sg.id
 
-  ip_protocol = "-1"
-  cidr_ipv4   = "0.0.0.0/0"
-}
-
-resource "aws_vpc_security_group_ingress_rule" "ingress_ipv6" {
-  security_group_id = aws_security_group.backend1_ecs_service_sg.id
-
-  ip_protocol = "-1"
-  cidr_ipv6   = "::/0"
+  ip_protocol = "tcp"
+  from_port   = 8081
+  to_port     = 8081
+  cidr_ipv4   = data.aws_vpc.backend1_vpc.cidr_block
 }
 
 resource "aws_vpc_security_group_egress_rule" "egress_ipv4" {
@@ -341,13 +381,11 @@ module "backend2_vpc" {
 
   transit_gateway_id = module.retrieve_parameters.parameter.transit_gateway
   transit_gateway_routes = {
-    private  = "0.0.0.0/0"
-    workload = "0.0.0.0/0"
+    private = "0.0.0.0/0"
   }
 
   subnets = {
     private         = { netmask = 24 }
-    workload        = { netmask = 24 }
     endpoints       = { netmask = 28 }
     transit_gateway = { netmask = 28 }
   }
@@ -359,14 +397,19 @@ resource "aws_route53_zone_association" "backend2_vpc_association" {
   vpc_id  = module.backend2_vpc.vpc_attributes.id
 }
 
+# Getting CIDR block allocated to the VPC
+data "aws_vpc" "backend2_vpc" {
+  id = module.backend2_vpc.vpc_attributes.id
+}
+
 # ---------- BACKEND APPLICATION 2 ----------
 # Application Load Balancer
 resource "aws_lb" "backend2_lb" {
   name               = "mservice2"
   internal           = true
   load_balancer_type = "application"
-  security_groups    = ["sg-0f08ab7a00e413c34"]
-  subnets            = values({ for k, v in module.backend2_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "workload" })
+  security_groups    = [aws_security_group.backend2_alb_sg.id]
+  subnets            = values({ for k, v in module.backend2_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "private" })
   ip_address_type    = "ipv4"
 }
 
@@ -409,7 +452,7 @@ resource "aws_vpc_security_group_egress_rule" "backend2_egress" {
   security_group_id = aws_security_group.backend2_alb_sg.id
 
   ip_protocol = "-1"
-  cidr_ipv4   = "0.0.0.0/0"
+  cidr_ipv4   = data.aws_vpc.backend2_vpc.cidr_block
 }
 
 # ALB target attachment (Lambda function)
@@ -430,20 +473,20 @@ resource "aws_lambda_permission" "lambda_target_alb" {
 
 # Lambda function
 resource "aws_lambda_function" "backend2_function" {
-  function_name = "arn:aws:lambda:eu-west-1:992382807606:function:mservice2"
-  handler       = "lambda_function.lambda_handler"
+  function_name = "mservice2"
+  handler       = "app2lambda.lambda_handler"
   runtime       = "python3.12"
   memory_size   = 128
-  timeout       = 3
+  timeout       = 10
 
-  role             = "arn:aws:iam::992382807606:role/service-role/mservice2-role-5hna1btr"
+  role             = aws_iam_role.lambda_role.arn
   filename         = "lambda_function.zip"
   source_code_hash = data.archive_file.lambda.output_base64sha256
 }
 
 data "archive_file" "lambda" {
   type        = "zip"
-  source_file = "../applications/backend2/lambda_function.py"
+  source_file = "../applications/mservice2/app2lambda.py"
   output_path = "lambda_function.zip"
 }
 
@@ -463,6 +506,8 @@ module "share_parameters" {
         transit_gateway_attachment_id = module.backend2_vpc.transit_gateway_attachment_id
       }
     })
+    #service1_domain_name = module.vpclattice_service1.services.mservice1.attributes.dns_entry[0].domain_name
+    #service2_domain_name = module.vpclattice_service2.services.mservice2.attributes.dns_entry[0].domain_name
     service1_domain_name = aws_lb.backend1_lb.dns_name
     service2_domain_name = aws_lb.backend2_lb.dns_name
   }
@@ -476,7 +521,7 @@ module "retrieve_parameters" {
     transit_gateway     = var.networking_account
     ipam_backend        = var.networking_account
     private_hosted_zone = var.networking_account
-    service_network     = var.networking_account
+    #service_network     = var.networking_account
   }
 }
 

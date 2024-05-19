@@ -5,7 +5,7 @@ data "aws_region" "current" {}
 
 # Retrieving parameters
 data "aws_ssm_parameter" "parameter" {
-    for_each = var.parameters
+  for_each = var.parameters
 
-    name = "arn:aws:ssm:${data.aws_region.current.name}:${each.value}:parameter/${each.key}"
+  name = "arn:aws:ssm:${data.aws_region.current.name}:${each.value}:parameter/${each.key}"
 }

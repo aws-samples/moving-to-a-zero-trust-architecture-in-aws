@@ -3,9 +3,11 @@ import json
 
 def lambda_handler(event, context):
     
+    # Obtaining headers and requestContent from event
     headers = event['headers']
-    print(headers)
-    
+    requestContext = event['requestContext']
+    output = dict(**headers, **requestContext)
+
     if event['path'] == "/":
         
         body = json.loads(event['body'])
@@ -13,14 +15,13 @@ def lambda_handler(event, context):
         data = {
             'app2message'       :   'Welcome to the mservice2 - this is a simple open API',
             'app2information'   :   'Meeoow - Make a connection to the secure endpoint for secrets',
-            'app2headers'       :   headers
+            'app2headers'       :   output
         }
     
         if body['portalidname'] == 'Anonymous':
             resp = 418
         else:
             resp = 200
-        
         
         return {
             'statusCode': resp,
@@ -37,7 +38,7 @@ def lambda_handler(event, context):
                 'app2secmessage'        :   'Welcome to the mservice2(secure) - this contains sensitive cat treat information',
                 'app2secinformation'    :   'The cat treats are located in the upper kitchen cupboard',
                 'app2secdetails'        :   'Folks are out - you have the run of the house',
-                'app2secheaders'        :   headers
+                'app2secheaders'        :   output
                 }
         else:
             resp = 418
@@ -45,7 +46,7 @@ def lambda_handler(event, context):
                 'app2secmessage'        :   'Welcome to the mservice2(secure) - this contains sensitive cat treat information',
                 'app2secinformation'    :   '[For more info, sign your requests]',
                 'app2secdetails'        :   '[For more info, sign your requests]',
-                'app2secheaders'        :   headers
+                'app2secheaders'        :   output
             }
     
         return {

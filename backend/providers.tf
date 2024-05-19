@@ -8,6 +8,13 @@ terraform {
       version = ">= 5.0.0"
     }
   }
+
+  backend "s3" {
+    bucket         = "nis343-backend-tfstate"
+    key            = "backend"
+    region         = "eu-west-1"
+    dynamodb_table = "nis343-backend-tfstate"
+  }
 }
 
 provider "aws" {

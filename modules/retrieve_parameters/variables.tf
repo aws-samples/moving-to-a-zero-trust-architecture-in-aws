@@ -2,5 +2,5 @@
 
 variable "parameters" {
   description = "List of parameters to retrieve."
-  type = map(string)
+  type        = map(string)
 }
