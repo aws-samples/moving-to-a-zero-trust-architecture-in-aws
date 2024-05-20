@@ -5,7 +5,7 @@ data "aws_region" "current" {}
 # ---------- VPC LATTICE VPC ASSOCIATION ---------
 # module "vpclattice_frontendvpc_sn_assoc" {
 #   source  = "aws-ia/amazon-vpc-lattice-module/aws"
-#   version = "0.0.3"
+#   version = "0.1.0"
 
 #   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
 

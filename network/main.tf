@@ -5,7 +5,7 @@ data "aws_organizations_organization" "org" {}
 # ---------- AMAZON VPC LATTICE SERVICE NETWORK --------------
 # module "vpclattice_service_network" {
 #   source  = "aws-ia/amazon-vpc-lattice-module/aws"
-#   version = "0.0.3"
+#   version = "0.1.0"
 
 #   service_network = {
 #     name      = "central-service-network"

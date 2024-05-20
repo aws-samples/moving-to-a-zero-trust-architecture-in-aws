@@ -6,7 +6,7 @@ data "aws_region" "current" {}
 # # Service 1
 # module "vpclattice_service1" {
 #   source  = "aws-ia/amazon-vpc-lattice-module/aws"
-#   version = "0.0.3"
+#   version = "0.1.0"
 
 #   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
 
@@ -57,15 +57,15 @@ data "aws_region" "current" {}
 #   }
 # }
 
-# # resource "aws_vpclattice_auth_policy" "service1_auth_policy" {
-# #   resource_identifier = module.vpclattice_service1.services.mservice1.attributes.arn
-# #   policy              = local.service1_policy
-# # }
+# resource "aws_vpclattice_auth_policy" "service1_auth_policy" {
+#   resource_identifier = module.vpclattice_service1.services.mservice1.attributes.arn
+#   policy              = local.service1_policy
+# }
 
 # # Service 2
 # module "vpclattice_service2" {
 #   source  = "aws-ia/amazon-vpc-lattice-module/aws"
-#   version = "0.0.3"
+#   version = "0.1.0"
 
 #   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
 
@@ -76,74 +76,34 @@ data "aws_region" "current" {}
 #       certificate_arn    = var.certificate_arn
 #       custom_domain_name = var.backend_service2_domain_name
 
-#       # listeners = {
-#       #   https_listener = {
-#       #     name = "https-443"
-#       #     port = 443
-#       #     protocol = "HTTPS"
-#       #     default_action_forward = {
-#       #       target_groups = {
-#       #         lambdatarget = { weight = 1 }
-#       #       }
-#       #     }
-#       #   }
-#       # }
-#     }
-#   }
-
-#   # target_groups = {
-#   #   lambdatarget = {
-#   #     name = "mservice2"
-#   #     type = "LAMBDA"
-
-#   #     targets = { lamdba = { id = aws_lambda_function.backend2_function.arn }}
-#   #   }
-#   # }
-# }
-
-# # resource "aws_vpclattice_auth_policy" "service2_auth_policy" {
-# #   resource_identifier = module.vpclattice_service2.services.mservice2.attributes.arn
-# #   policy              = local.service2_policy
-# # }
-
-# # TEMP: VPC LATTICE LAMBDA TARGET GROUP AND TARGET
-# resource "aws_vpclattice_listener" "vpclattice_service2_listener" {
-#   name               = "https-443"
-#   protocol           = "HTTPS"
-#   port               = 443
-#   service_identifier = module.vpclattice_service2.services.mservice2.attributes.arn
-#   default_action {
-#     forward {
-#       target_groups {
-#         target_group_identifier = aws_vpclattice_target_group.vpclattice_target_group_lambda.arn
+#       listeners = {
+#         https_listener = {
+#           name = "https-443"
+#           port = 443
+#           protocol = "HTTPS"
+#           default_action_forward = {
+#             target_groups = {
+#               lambdatarget = { weight = 1 }
+#             }
+#           }
+#         }
 #       }
 #     }
 #   }
-# }
 
-# resource "aws_vpclattice_target_group" "vpclattice_target_group_lambda" {
-#   name = "mservice2"
-#   type = "LAMBDA"
+#   target_groups = {
+#     lambdatarget = {
+#       name = "mservice2"
+#       type = "LAMBDA"
 
-#   config {
-#     lambda_event_structure_version = "V2"
+#       targets = { lamdba = { id = aws_lambda_function.backend2_function.arn }}
+#     }
 #   }
 # }
 
-# resource "aws_vpclattice_target_group_attachment" "vpclattice_target_attachment_lambda" {
-#   target_group_identifier = aws_vpclattice_target_group.vpclattice_target_group_lambda.arn
-
-#   target {
-#     id = aws_lambda_function.backend2_function.arn
-#   }
-# }
-
-# resource "aws_lambda_permission" "lambda_target_vpclattice" {
-#   statement_id  = "AllowExecutionFromVpcLattice"
-#   action        = "lambda:InvokeFunction"
-#   function_name = aws_lambda_function.backend2_function.function_name
-#   principal     = "vpc-lattice.amazonaws.com"
-#   source_arn    = aws_vpclattice_target_group.vpclattice_target_group_lambda.arn
+# resource "aws_vpclattice_auth_policy" "service2_auth_policy" {
+#   resource_identifier = module.vpclattice_service2.services.mservice2.attributes.arn
+#   policy              = local.service2_policy
 # }
 
 # ---------- BACKEND VPC (1) ----------
