@@ -1,5 +1,5 @@
 ###### Requirements without Version Specifiers ######
 flask == 3.0.2
-requests == 2.31.0
+requests == 2.32.0
 botocore == 1.34.70
 awscrt == 0.20.9
