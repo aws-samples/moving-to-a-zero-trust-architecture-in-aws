@@ -78,8 +78,8 @@ data "aws_region" "current" {}
 
 #       listeners = {
 #         https_listener = {
-#           name = "https-443"
-#           port = 443
+#           name     = "https-443"
+#           port     = 443
 #           protocol = "HTTPS"
 #           default_action_forward = {
 #             target_groups = {
@@ -96,7 +96,7 @@ data "aws_region" "current" {}
 #       name = "mservice2"
 #       type = "LAMBDA"
 
-#       targets = { lamdba = { id = aws_lambda_function.backend2_function.arn }}
+#       targets = { lamdba = { id = aws_lambda_function.backend2_function.arn } }
 #     }
 #   }
 # }
@@ -138,10 +138,11 @@ module "backend1_vpc" {
   }
 }
 
-# Associating central Private HZ (from Networking Account)
-resource "aws_route53_zone_association" "backend1_vpc_association" {
-  zone_id = module.retrieve_parameters.parameter.private_hosted_zone
-  vpc_id  = module.backend1_vpc.vpc_attributes.id
+# Associating central Route53 Profile (from Networking Account)
+resource "awscc_route53profiles_profile_association" "backend1_r53_profile_association" {
+  name        = "r53_profile_backend1_association"
+  profile_id  = module.retrieve_parameters.parameter.r53_profile
+  resource_id = module.backend1_vpc.vpc_attributes.id
 }
 
 # Getting CIDR block allocated to the VPC
@@ -351,10 +352,11 @@ module "backend2_vpc" {
   }
 }
 
-# Associating central Private HZ (from Networking Account)
-resource "aws_route53_zone_association" "backend2_vpc_association" {
-  zone_id = module.retrieve_parameters.parameter.private_hosted_zone
-  vpc_id  = module.backend2_vpc.vpc_attributes.id
+# Associating central Route53 Profile (from Networking Account)
+resource "awscc_route53profiles_profile_association" "backend2_r53_profile_association" {
+  name        = "r53_profile_backend2_association"
+  profile_id  = module.retrieve_parameters.parameter.r53_profile
+  resource_id = module.backend2_vpc.vpc_attributes.id
 }
 
 # Getting CIDR block allocated to the VPC
@@ -481,7 +483,8 @@ module "retrieve_parameters" {
     transit_gateway     = var.networking_account
     ipam_backend        = var.networking_account
     private_hosted_zone = var.networking_account
-    #service_network     = var.networking_account
+    r53_profile         = var.networking_account
+    #service_network    = var.networking_account
   }
 }
 

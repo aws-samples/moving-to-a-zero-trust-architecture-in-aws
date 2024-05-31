@@ -2,6 +2,18 @@
 
 data "aws_organizations_organization" "org" {}
 
+# ---------- AWS RAM SHARE ----------
+# Sharing Networking resources with the AWS Organization
+resource "aws_ram_resource_share" "resource_share" {
+  name                      = "Resource Share - Networking Account"
+  allow_external_principals = false
+}
+
+resource "aws_ram_principal_association" "principal_association" {
+  principal          = data.aws_organizations_organization.org.arn
+  resource_share_arn = aws_ram_resource_share.resource_share.arn
+}
+
 # ---------- AMAZON VPC LATTICE SERVICE NETWORK --------------
 # module "vpclattice_service_network" {
 #   source  = "aws-ia/amazon-vpc-lattice-module/aws"
@@ -13,20 +25,9 @@ data "aws_organizations_organization" "org" {}
 #   }
 # }
 
-# # Sharing VPC Lattice service network with AWS Organization
-# resource "aws_ram_resource_share" "vpclattice_resource_share" {
-#   name                      = "VPC Lattice service network - Networking Account"
-#   allow_external_principals = false
-# }
-
-# resource "aws_ram_principal_association" "vpclattice_principal_association" {
-#   principal          = data.aws_organizations_organization.org.arn
-#   resource_share_arn = aws_ram_resource_share.vpclattice_resource_share.arn
-# }
-
 # resource "aws_ram_resource_association" "vpclattice_sn_share" {
 #   resource_arn       = module.vpclattice_service_network.service_network.arn
-#   resource_share_arn = aws_ram_resource_share.vpclattice_resource_share.arn
+#   resource_share_arn = aws_ram_resource_share.resource_share.arn
 # }
 
 # ---------- IPAM ----------
@@ -123,6 +124,24 @@ resource "aws_route53_vpc_association_authorization" "vpc_association_auth" {
   vpc_id  = each.value.vpc_id
 }
 
+# Route 53 Profile
+resource "awscc_route53profiles_profile" "r53_profile" {
+  name = "phz_vpc-lattice"
+}
+
+# PHZ associated to R53 profile
+resource "awscc_route53profiles_profile_resource_association" "r53_profile_resource_association" {
+  name         = "phz_vpc-lattice"
+  profile_id   = awscc_route53profiles_profile.r53_profile.id
+  resource_arn = aws_route53_zone.private_hosted_zone.arn
+}
+
+# Sharing the R53 profile
+resource "aws_ram_resource_association" "r53_profile_share" {
+  resource_arn       = awscc_route53profiles_profile.r53_profile.arn
+  resource_share_arn = aws_ram_resource_share.resource_share.arn
+}
+
 # ---------- TRANSIT GATEWAY ----------
 # Hub and Spoke network
 module "network" {
@@ -173,17 +192,6 @@ locals {
   spoke_vpcs   = merge({ frontend_vpc = local.frontend_vpc }, local.backend_vpcs)
 }
 
-# Sharing Transit Gateway with the AWS Organization
-resource "aws_ram_resource_share" "resource_share" {
-  name                      = "Transit Gateway - Networking Account"
-  allow_external_principals = false
-}
-
-resource "aws_ram_principal_association" "principal_association" {
-  principal          = data.aws_organizations_organization.org.arn
-  resource_share_arn = aws_ram_resource_share.resource_share.arn
-}
-
 resource "aws_ram_resource_association" "transit_gateway_share" {
   resource_arn       = module.network.transit_gateway.arn
   resource_share_arn = aws_ram_resource_share.resource_share.arn
@@ -195,11 +203,11 @@ module "share_parameter_share" {
   source = "../modules/share_parameter"
 
   parameters = {
-    transit_gateway     = module.network.transit_gateway.id
-    ipam_frontend       = module.ipam.pools_level_2["ireland/frontend"].id
-    ipam_backend        = module.ipam.pools_level_2["ireland/backend"].id
-    private_hosted_zone = aws_route53_zone.private_hosted_zone.id
-    #service_network     = module.vpclattice_service_network.service_network.arn
+    transit_gateway = module.network.transit_gateway.id
+    ipam_frontend   = module.ipam.pools_level_2["ireland/frontend"].id
+    ipam_backend    = module.ipam.pools_level_2["ireland/backend"].id
+    r53_profile     = awscc_route53profiles_profile.r53_profile.id
+    #service_network    = module.vpclattice_service_network.service_network.arn
   }
 }
 

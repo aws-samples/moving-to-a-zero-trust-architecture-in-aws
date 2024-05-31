@@ -45,10 +45,11 @@ module "frontend_vpc" {
   }
 }
 
-# Associating central Private HZ (from Networking Account)
-resource "aws_route53_zone_association" "frontend_vpc_association" {
-  zone_id = module.retrieve_parameters.parameter.private_hosted_zone
-  vpc_id  = module.frontend_vpc.vpc_attributes.id
+# Associating central Route53 Profile (from Networking Account)
+resource "awscc_route53profiles_profile_association" "r53_profile_association" {
+  name        = "r53_profile_frontend_association"
+  profile_id  = module.retrieve_parameters.parameter.r53_profile
+  resource_id = module.frontend_vpc.vpc_attributes.id
 }
 
 # Getting CIDR block allocated to the VPC
@@ -179,7 +180,7 @@ resource "aws_vpc_security_group_ingress_rule" "allowing_ingress_https" {
   from_port   = 443
   to_port     = 443
   ip_protocol = "tcp"
-  cidr_ipv4   = "0.0.0.0/0"
+  cidr_ipv4   = data.aws_vpc.vpc.cidr_block
 }
 
 resource "aws_vpc_security_group_egress_rule" "allowing_ava_alb_connectivity" {
@@ -389,9 +390,9 @@ module "retrieve_parameters" {
   source = "../modules/retrieve_parameters"
 
   parameters = {
-    transit_gateway     = var.networking_account
-    ipam_frontend       = var.networking_account
-    private_hosted_zone = var.networking_account
-    #service_network     = var.networking_account
+    transit_gateway = var.networking_account
+    ipam_frontend   = var.networking_account
+    r53_profile     = var.networking_account
+    #service_network = var.networking_account
   }
 }
