@@ -178,10 +178,10 @@ def runapp():
   try:
     logger.info("Attempting connection to mservice1 secured endpoint")
   ## Comment out the below line when switching to signed requests
-    #m1bresp = requests.get(mservice1sec)
+    m1bresp = requests.get(mservice1sec)
   ## Uncomment the below two lines when switching to signed requests
-    prepped = signer(mservice1sec)
-    m1bresp = requests.get(prepped.url,headers=prepped.headers,json=portal)
+    #prepped = signer(mservice1sec)
+    #m1bresp = requests.get(prepped.url,headers=prepped.headers,json=portal)
 
     payload2 = json.loads(m1bresp.content)
     render2 = {

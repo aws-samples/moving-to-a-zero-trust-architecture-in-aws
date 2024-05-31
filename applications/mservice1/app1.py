@@ -94,10 +94,10 @@ def app1respsec():
         headers = dict(request.headers)
 
     ## Comment out the below line when switching to signed requests
-        #m2asecresp = requests.get(mservice2sec)
+        m2asecresp = requests.get(mservice2sec)
     ## Uncomment the below line when switching to signed requests
-        prepped = signer(mservice2sec)
-        m2asecresp = requests.get(prepped.url, headers=prepped.headers)
+        #prepped = signer(mservice2sec)
+        #m2asecresp = requests.get(prepped.url, headers=prepped.headers)
             
         m2secpayload = json.loads(m2asecresp.content)
     
