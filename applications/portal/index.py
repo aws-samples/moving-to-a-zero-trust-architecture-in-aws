@@ -141,8 +141,8 @@ def runapp():
     payload = json.loads(m1aresp.content)
 
     render1 = {
-      'app1img'               : os.path.join(img,'scaredcat.jpg') if m1aresp.status_code == 200 else os.path.join(img,'wait.jpg'),
-      'app2img'               : os.path.join(img,'scaredcat.jpg') if payload['app2status'] == 200 else os.path.join(img,'wait.jpg'),
+      'app1img'               : os.path.join(img,'mservice1_open.png') if m1aresp.status_code == 200 else os.path.join(img,'wait.jpg'),
+      'app2img'               : os.path.join(img,'mservice2_open.png') if payload['app2status'] == 200 else os.path.join(img,'wait.jpg'),
       'app1headers'           : payload['app1headers'],
       'app1url'               : payload['app1url'],
       'app1status'            : m1aresp.status_code,
@@ -185,8 +185,8 @@ def runapp():
 
     payload2 = json.loads(m1bresp.content)
     render2 = {
-      'app1secimg'            : os.path.join(img,'catmilk.png') if m1bresp.status_code == 200 else os.path.join(img,'wait.jpg'),
-      'app2secimg'            : os.path.join(img,'catincupboard.png') if payload2['app2secstatus'] == 200 else os.path.join(img,'wait.jpg'),
+      'app1secimg'            : os.path.join(img,'mservice1_secure.png') if m1bresp.status_code == 200 else os.path.join(img,'wait.jpg'),
+      'app2secimg'            : os.path.join(img,'mservice2_secure.png') if payload2['app2secstatus'] == 200 else os.path.join(img,'wait.jpg'),
       'app1secstatus'         : m1bresp.status_code,
       'app1secmessage'        : payload2['app1secmessage'],
       'app1secinformation'    : payload2['app1secinformation'],
