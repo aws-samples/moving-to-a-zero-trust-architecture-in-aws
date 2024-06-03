@@ -61,19 +61,29 @@
             </tr>
         </table>
 
+    <p></p>
+
+    <table border="3" >
+        <tr>
+            <td style="min-width: 600px;text-align: center">
+                <img src="{{ url_for('static', filename='images/arrow.png') }}" alt="Less Secure"></td>
+            <td style="min-width: 600px;;text-align: center;">
+                <img src="{{ url_for('static', filename='images/arrow.png') }}" alt="More Secure"></td>
+        </tr>
+
     </table >
     <table border="3" >
         <h2 style=color:aliceblue>
             Elastic Container Service Tier (mservice1)
         </h2>
         <tr>
-            <th style="background-color: bisque; color: rgb(255, 20, 20);">Less Secure Connection</th>
-            <th style="background-color: aquamarine; color: darkorange;">More Secure Connection</th>
+            <th style="background-color: bisque; color: rgb(255, 20, 20);">AUTHENTICATED Connection</th>
+            <th style="background-color: aquamarine; color: darkorange;">AUTHORIZED Connection</th>
         </tr>
         <tr>
-            <td>
+            <td style="text-align: center">
                 <img src="{{render['app1img']}}" alt="Less Secure"></td>
-            <td>
+            <td style="text-align: center">
                 <img src="{{render['app1secimg']}}" alt="More Secure"></td>
         </tr>
         <tr>
@@ -131,19 +141,29 @@
             </td>
         </tr>
     </table >
+    
+    <p></p>
+
+    <table border="3" >
+        <tr>
+            <td style="min-width: 600px;text-align: center">
+                <img src="{{ url_for('static', filename='images/arrow.png') }}" alt="Less Secure"></td>
+            <td style="min-width: 600px;;text-align: center;">
+                <img src="{{ url_for('static', filename='images/arrow.png') }}" alt="More Secure"></td>
+        </tr>
 
     <table border="3" >
         <h2 style=color:aliceblue>
             LAMBDA Function Tier (mservice2)
         </h2>
         <tr>
-            <th style="background-color: bisque; color: rgb(255, 20, 20);">Less Secure Connection</th>
-            <th style="background-color: aquamarine; color: darkorange;">More Secure Connection</th>
+            <th style="background-color: bisque; color: rgb(255, 20, 20);">AUTHENTICATED Connection</th>
+            <th style="background-color: aquamarine; color: darkorange;">AUTHORIZED Connection</th>
         </tr>
         <tr>
-            <td>
+            <td style="text-align: center" >
                 <img src="{{render['app2img']}}" alt="Less Secure"></td>
-            <td>
+            <td style="text-align: center" >
                 <img src="{{render['app2secimg']}}" alt="More Secure"></td>
         </tr>
         <tr>
