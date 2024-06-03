@@ -14,7 +14,7 @@ def lambda_handler(event, context):
 
         data = {
             'app2message'       :   'Welcome to the mservice2 - this is a simple open API',
-            'app2information'   :   'Meeoow - Make a connection to the secure endpoint for secrets',
+            'app2information'   :   'Make a connection to the secure endpoint for secrets',
             'app2headers'       :   output
         }
     
@@ -36,8 +36,8 @@ def lambda_handler(event, context):
             resp = 200
             data = {
                 'app2secmessage'        :   'Welcome to the mservice2(secure) - this contains sensitive cat treat information',
-                'app2secinformation'    :   'The cat treats are located in the upper kitchen cupboard',
-                'app2secdetails'        :   'Folks are out - you have the run of the house',
+                'app2secinformation'    :   'A word on feline capabilities',
+                'app2secdetails'        :   'Cats can jump 5 times their own height',
                 'app2secheaders'        :   output
                 }
         else:

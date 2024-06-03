@@ -45,7 +45,7 @@ def app1resp():
             'app1headers'       :   dict(request.headers),
             'app1url'           :   request.url,
             'app1message'       :   "Welcome to mservice1 - this is a simple open API - it calls mservice2",
-            'app1information'   :   "Meeoow - Make a connection to the secure endpoint for secrets",
+            'app1information'   :   "Make a connection to the secure endpoint for secrets",
             'app2headers'       :   m2payload['app2headers'],
             'app2url'           :   m2aresp.url,
             'app2message'       :   m2payload['app2message'],
@@ -105,8 +105,8 @@ def app1respsec():
             resp = 200
             data = {
                 'app1secmessage'        :   'Welcome to mservice1 (secure) - this contains sensitive cat treat information',
-                'app1secinformation'    :   'There is a cup of milk that im sure would enjoy',
-                'app1secdetails'        :   'Sit back, take a load off and enjoy',
+                'app1secinformation'    :   'Cats > that Dogs, it is a fact :-D ',
+                'app1secdetails'        :   'House cats share 95.6 percent of their genetic makeup with tigers.',
                 'app1secheaders'        :   dict(request.headers),
                 'app1securl'            :   request.url,
                 'app2secmessage'        :   m2secpayload['app2secmessage'],
