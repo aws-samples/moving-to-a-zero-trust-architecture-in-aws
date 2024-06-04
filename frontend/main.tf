@@ -2,18 +2,6 @@
 
 data "aws_region" "current" {}
 
-# ---------- VPC LATTICE VPC ASSOCIATION ---------
-# module "vpclattice_frontendvpc_sn_assoc" {
-#   source  = "aws-ia/amazon-vpc-lattice-module/aws"
-#   version = "0.1.0"
-
-#   service_network = { identifier = module.retrieve_parameters.parameter.service_network }
-
-#   vpc_associations = {
-#     frontend_vpc = { vpc_id = module.frontend_vpc.vpc_attributes.id }
-#   }
-# }
-
 # ---------- FRONTEND VPC ----------
 module "frontend_vpc" {
   source  = "aws-ia/vpc/aws"
@@ -29,6 +17,10 @@ module "frontend_vpc" {
   transit_gateway_routes = {
     application = "10.0.0.0/8"
   }
+
+  # vpc_lattice = {
+  #   service_network_identifier = module.retrieve_parameters.parameter.service_network
+  # }
 
   subnets = {
     public = {

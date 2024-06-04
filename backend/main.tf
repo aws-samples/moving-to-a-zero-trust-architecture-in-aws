@@ -482,7 +482,6 @@ module "retrieve_parameters" {
   parameters = {
     transit_gateway     = var.networking_account
     ipam_backend        = var.networking_account
-    private_hosted_zone = var.networking_account
     r53_profile         = var.networking_account
     #service_network    = var.networking_account
   }
