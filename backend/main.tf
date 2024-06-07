@@ -17,7 +17,7 @@ data "aws_region" "current" {}
 #   services = {
 #     mservice1 = {
 #       name               = "mservice1"
-#       auth_type          = "NONE" #"AWS_IAM"
+#       auth_type          = "AWS_IAM"
 #       certificate_arn    = var.certificate_arn
 #       custom_domain_name = var.backend_service1_domain_name
 
@@ -72,7 +72,7 @@ data "aws_region" "current" {}
 #   services = {
 #     mservice2 = {
 #       name               = "mservice2"
-#       auth_type          = "NONE" #"AWS_IAM"
+#       auth_type          = "AWS_IAM"
 #       certificate_arn    = var.certificate_arn
 #       custom_domain_name = var.backend_service2_domain_name
 
@@ -96,7 +96,7 @@ data "aws_region" "current" {}
 #       name = "mservice2"
 #       type = "LAMBDA"
 
-#       targets = { lamdba = { id = aws_lambda_function.backend2_function.arn } }
+#       targets = { lambda = { id = aws_lambda_function.backend2_function.arn } }
 #     }
 #   }
 # }
@@ -468,8 +468,6 @@ module "share_parameters" {
         transit_gateway_attachment_id = module.backend2_vpc.transit_gateway_attachment_id
       }
     })
-    #service1_domain_name = module.vpclattice_service1.services.mservice1.attributes.dns_entry[0].domain_name
-    #service2_domain_name = module.vpclattice_service2.services.mservice2.attributes.dns_entry[0].domain_name
     service1_domain_name = aws_lb.backend1_lb.dns_name
     service2_domain_name = aws_lb.backend2_lb.dns_name
   }
@@ -480,10 +478,10 @@ module "retrieve_parameters" {
   source = "../modules/retrieve_parameters"
 
   parameters = {
-    transit_gateway     = var.networking_account
-    ipam_backend        = var.networking_account
-    r53_profile         = var.networking_account
-    #service_network    = var.networking_account
+    transit_gateway = var.networking_account
+    ipam_backend    = var.networking_account
+    r53_profile     = var.networking_account
+    #service_network = var.networking_account
   }
 }
 

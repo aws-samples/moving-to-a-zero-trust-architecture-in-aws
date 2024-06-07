@@ -116,14 +116,6 @@ resource "aws_route53_record" "service2" {
   records = [module.retrieve_parameters.parameter.service2_domain_name]
 }
 
-# VPC association authorization
-resource "aws_route53_vpc_association_authorization" "vpc_association_auth" {
-  for_each = nonsensitive(local.spoke_vpcs)
-
-  zone_id = aws_route53_zone.private_hosted_zone.zone_id
-  vpc_id  = each.value.vpc_id
-}
-
 # Route 53 Profile
 resource "awscc_route53profiles_profile" "r53_profile" {
   name = "phz_vpc-lattice"
@@ -207,7 +199,7 @@ module "share_parameter_share" {
     ipam_frontend   = module.ipam.pools_level_2["ireland/frontend"].id
     ipam_backend    = module.ipam.pools_level_2["ireland/backend"].id
     r53_profile     = awscc_route53profiles_profile.r53_profile.id
-    #service_network    = module.vpclattice_service_network.service_network.arn
+    #service_network = module.vpclattice_service_network.service_network.arn
   }
 }
 
