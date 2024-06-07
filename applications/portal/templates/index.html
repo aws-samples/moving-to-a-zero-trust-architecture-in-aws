@@ -46,20 +46,21 @@
                 </table>
             </td>
         </tr>
-        <table>
-            <tr>
-                <td>
-                    <form action="/" method="GET">
-                        <input type="submit" value="-- RESET --">
-                    </form>
-                </td>     
-                <td>
-                    <form action="/run" method="POST">
-                        <input type="submit" name="status" value="-- RUN ME --">
-                    </form>
-                </td>
-            </tr>
-        </table>
+    </table>
+    <table>
+        <tr>
+            <td>
+                <form action="/" method="GET">
+                    <input type="submit" value="-- RESET --">
+                </form>
+            </td>     
+            <td>
+                <form action="/run" method="POST">
+                    <input type="submit" name="status" value="-- RUN ME --">
+                </form>
+            </td>
+        </tr>
+    </table>
 
     <p></p>
 
@@ -81,9 +82,9 @@
             <th style="background-color: aquamarine; color: darkorange;">AUTHORIZED Connection</th>
         </tr>
         <tr>
-            <td style="text-align: center">
+            <td style="min-width: 600px;text-align: center">
                 <img src="{{render['app1img']}}" alt="Less Secure"></td>
-            <td style="text-align: center">
+            <td style="min-width: 600px;text-align: center">
                 <img src="{{render['app1secimg']}}" alt="More Secure"></td>
         </tr>
         <tr>
@@ -151,6 +152,7 @@
             <td style="min-width: 600px;;text-align: center;">
                 <img src="{{ url_for('static', filename='images/arrow.png') }}" alt="More Secure"></td>
         </tr>
+    </table>
 
     <table border="3" >
         <h2 style=color:aliceblue>
@@ -161,9 +163,9 @@
             <th style="background-color: aquamarine; color: darkorange;">AUTHORIZED Connection</th>
         </tr>
         <tr>
-            <td style="text-align: center" >
+            <td style="min-width: 600px;text-align: center" >
                 <img src="{{render['app2img']}}" alt="Less Secure"></td>
-            <td style="text-align: center" >
+            <td style="min-width: 600px;text-align: center" >
                 <img src="{{render['app2secimg']}}" alt="More Secure"></td>
         </tr>
         <tr>
