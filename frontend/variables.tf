@@ -3,13 +3,6 @@
 variable "aws_region" {
   type        = string
   description = "AWS Region."
-
-  default = "eu-west-1"
-}
-
-variable "client_vpn" {
-  type        = map(string)
-  description = "Client VPN configuration information."
 }
 
 variable "certificate_arn" {

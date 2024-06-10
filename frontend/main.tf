@@ -7,20 +7,13 @@ module "frontend_vpc" {
   source  = "aws-ia/vpc/aws"
   version = "4.4.2"
 
+  cidr_block = "10.0.0.0/16"
   name     = "frontend-vpc"
   az_count = 2
 
-  vpc_ipv4_ipam_pool_id   = module.retrieve_parameters.parameter.ipam_frontend
-  vpc_ipv4_netmask_length = 16
-
-  transit_gateway_id = module.retrieve_parameters.parameter.transit_gateway
-  transit_gateway_routes = {
-    application = "10.0.0.0/8"
+  vpc_lattice = {
+    service_network_identifier = module.retrieve_parameters.parameter.service_network
   }
-
-  # vpc_lattice = {
-  #   service_network_identifier = module.retrieve_parameters.parameter.service_network
-  # }
 
   subnets = {
     public = {
@@ -42,51 +35,6 @@ resource "awscc_route53profiles_profile_association" "r53_profile_association" {
   name        = "r53_profile_frontend_association"
   profile_id  = module.retrieve_parameters.parameter.r53_profile
   resource_id = module.frontend_vpc.vpc_attributes.id
-}
-
-# Getting CIDR block allocated to the VPC
-data "aws_vpc" "vpc" {
-  id = module.frontend_vpc.vpc_attributes.id
-}
-
-# ---------- CLIENT VPN ----------
-resource "aws_ec2_client_vpn_endpoint" "clientvpn" {
-  description            = "client-vpn"
-  server_certificate_arn = var.client_vpn.server_certificate_arn
-  client_cidr_block      = var.client_vpn.cidr_block
-
-  self_service_portal = "enabled"
-  split_tunnel        = false
-
-  authentication_options {
-    type                           = "federated-authentication"
-    saml_provider_arn              = var.client_vpn.saml_provider_arn
-    self_service_saml_provider_arn = var.client_vpn.self_service_saml_provider_arn
-  }
-
-  dns_servers = [cidrhost(data.aws_vpc.vpc.cidr_block, 2)]
-
-  connection_log_options {
-    enabled = false
-  }
-
-  tags = {
-    Name = "client-vpn-endpoint"
-  }
-}
-
-resource "aws_ec2_client_vpn_network_association" "clientvpn_network_association" {
-  for_each = { for k, v in module.frontend_vpc.private_subnet_attributes_by_az : split("/", k)[1] => v.id if split("/", k)[0] == "private" }
-
-  client_vpn_endpoint_id = aws_ec2_client_vpn_endpoint.clientvpn.id
-  subnet_id              = each.value
-}
-
-resource "aws_ec2_client_vpn_authorization_rule" "clientvpn_authorization_rule" {
-  description            = "Client VPN Authorization (All)"
-  client_vpn_endpoint_id = aws_ec2_client_vpn_endpoint.clientvpn.id
-  target_network_cidr    = var.client_vpn.target_network_cidr
-  access_group_id        = var.client_vpn.access_group_id
 }
 
 # ---------- AWS VERIFIED ACCESS ----------
@@ -368,10 +316,6 @@ module "share_parameters" {
   source = "../modules/share_parameter"
 
   parameters = {
-    frontend_vpc = jsonencode({
-      vpc_id                        = module.frontend_vpc.vpc_attributes.id
-      transit_gateway_attachment_id = module.frontend_vpc.transit_gateway_attachment_id
-    })
     frontend_ava_domain_name = aws_verifiedaccess_endpoint.ava_endpoint.endpoint_domain
     frontent_alb_domain_name = aws_lb.lb.dns_name
   }
@@ -382,9 +326,7 @@ module "retrieve_parameters" {
   source = "../modules/retrieve_parameters"
 
   parameters = {
-    transit_gateway = var.networking_account
-    ipam_frontend   = var.networking_account
     r53_profile     = var.networking_account
-    #service_network = var.networking_account
+    service_network = var.networking_account
   }
 }

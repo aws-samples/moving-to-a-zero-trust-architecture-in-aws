@@ -21,15 +21,15 @@ img = os.path.join('static','images')
 global portal
 render = {}
 
-mservice1 = "https://mservice1.backend.pablosc.people.aws.dev/"
-mservice1sec = "https://mservice1.backend.pablosc.people.aws.dev/secure"
+mservice1 = "{DOMAIN_NAME}"
+mservice1sec = "{DOMAIN_NAME}"
 
 avaurl = 'https://public-keys.prod.verified-access.eu-west-1.amazonaws.com/'
 
 # Secure signer function
 def signer(endpoint):
   session = botocore.session.Session()
-  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', 'eu-west-1')
+  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', '{REGION}')
   endpoint = endpoint
   data = "null"
   headers = {}

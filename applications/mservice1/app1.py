@@ -14,14 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 # Define Variables
-mservice2 = "https://mservice2.backend.pablosc.people.aws.dev"
-mservice2sec = "https://mservice2.backend.pablosc.people.aws.dev/secure"
+mservice2 = "{DOMAIN_NAME}"
+mservice2sec = "{DOMAIN_NAME}/secure"
 
 # Secure signer function
 
 def signer(endpoint):
   session = botocore.session.Session()
-  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', 'eu-west-1')
+  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', '{REGION}')
   endpoint = endpoint
   data = "null"
   headers = {}

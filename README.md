@@ -1,4 +1,4 @@
-# reInforce 2024 - Moving to a Zero Trust architecture in AWS using Infrastructure-as-Code
+# Moving to a Zero Trust architecture in AWS using Infrastructure-as-Code
 
 
 
