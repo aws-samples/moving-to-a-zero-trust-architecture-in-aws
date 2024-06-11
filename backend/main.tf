@@ -342,8 +342,8 @@ module "share_parameters" {
   source = "../modules/share_parameter"
 
   parameters = {
-    service1_domain_name = aws_lb.backend1_lb.dns_name
-    service2_domain_name = aws_lb.backend2_lb.dns_name
+    service1_domain_name = module.vpclattice_service1.services.mservice1.attributes.dns_entry
+    service2_domain_name = module.vpclattice_service2.services.mservice2.attributes.dns_entry
   }
 }
 
