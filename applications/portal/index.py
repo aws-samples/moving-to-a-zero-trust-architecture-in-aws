@@ -22,9 +22,9 @@ global portal
 render = {}
 
 mservice1 = "{DOMAIN_NAME}"
-mservice1sec = "{DOMAIN_NAME}"
+mservice1sec = "{DOMAIN_NAME}/secure"
 
-avaurl = 'https://public-keys.prod.verified-access.eu-west-1.amazonaws.com/'
+avaurl = 'https://public-keys.prod.verified-access.{REGION}.amazonaws.com/'
 
 # Secure signer function
 def signer(endpoint):
