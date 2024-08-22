@@ -1,0 +1,18 @@
+version: 0.2
+
+env:
+  shell: bash
+  exported-variables: image
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+      - pwd
+      - cd zero-trust/applications/mservice1
+  build:
+    commands: 
+      - docker build -t "$IMAGE_REPO_NAME:latest" .
+  post_build:
+    commands:
+      - docker push "$IMAGE_REPO_NAME:latest"

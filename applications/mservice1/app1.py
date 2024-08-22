@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 # Define Variables
-mservice2 = "{DOMAIN_NAME}"
-mservice2sec = "{DOMAIN_NAME}/secure"
+mservice2 = http://$DNSBackEnd2
+mservice2sec = http://$DNSBackEnd2/secure"
 
 # Secure signer function
 

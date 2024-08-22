@@ -21,8 +21,8 @@ img = os.path.join('static','images')
 global portal
 render = {}
 
-mservice1 = "{DOMAIN_NAME}"
-mservice1sec = "{DOMAIN_NAME}/secure"
+mservice1 = http://$DNSBackEnd1
+mservice1sec = http://$DNSBackEnd1/secure
 
 avaurl = 'https://public-keys.prod.verified-access.{REGION}.amazonaws.com/'
 
