@@ -26,8 +26,8 @@ Mappings:
 
 Resources:
 
-## Global Resources
-# Roles
+# Global Resources
+## Roles
 
   ecsServiceLinkedRole:
     Type: AWS::IAM::ServiceLinkedRole
@@ -35,7 +35,7 @@ Resources:
       AWSServiceName: ecs.amazonaws.com
       Description: Role to enable Amazon ECS to manage your cluster
 
-# S3
+## S3
 
   codeRepoBucket:
     Type: AWS::S3::Bucket
@@ -56,7 +56,7 @@ Resources:
             - - !Ref AWS::AccountId
               - codeRepoBucket
 
-# DNS
+## DNS
 
   microserviceRoute53Zone:
     Type: AWS::Route53::HostedZone
@@ -81,8 +81,7 @@ Resources:
         - VPCId: !Ref inspectionVPC
           VPCRegion: !Ref AWS::Region
 
-
-# Transit Gateway Resources
+## Transit Gateway Resources
 
   regionalTgw:
     Type: AWS::EC2::TransitGateway
