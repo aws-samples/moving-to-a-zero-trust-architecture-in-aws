@@ -9,7 +9,9 @@ phases:
     commands:
       - aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
       - pwd
+      - ls
       - cd zero-trust/applications/portal
+      - ls
   build:
     commands: 
       - docker build -t "$IMAGE_REPO_NAME:latest" .

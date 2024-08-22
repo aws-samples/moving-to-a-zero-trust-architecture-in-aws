@@ -1,5 +1,6 @@
 # Import Modules
 
+import os
 from flask import Flask, request
 import requests
 from botocore.awsrequest import AWSRequest
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 # Define Variables
-mservice2 = http://$DNSBackEnd2
-mservice2sec = http://$DNSBackEnd2/secure"
+mservice2 = 'http://' + os.environ['DNSBackEnd2']
+mservice2sec = 'http://' + os.environ['DNSBackEnd2'] + '/secure'
 
 # Secure signer function
 

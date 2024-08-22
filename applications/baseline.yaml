@@ -1,0 +1,2291 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Micro Service ZeroTrust - clientSideTemplate
+Transform: 'AWS::LanguageExtensions'
+
+Parameters:
+  GitRepo:
+    Default: https://github.com/aws-samples/moving-to-a-zero-trust-architecture-in-aws.git
+    Type: String
+  ApplicationDomain:
+    Default: unicornpacket.com
+    Type: String
+
+Mappings:
+  Addressing:
+    supernet:
+      v4: 172.16.0.0/12
+      v6: 2a05:d018::/32
+    frontEnd:
+      v4: 172.16.0.0/24
+    backEnd1:
+      v4: 172.17.0.0/24
+    backEnd2:
+      v4: 172.18.0.0/24
+    inspection:
+      v4: 172.19.0.0/24
+
+Resources:
+
+## Global Resources
+# Roles
+
+  ecsServiceLinkedRole:
+    Type: AWS::IAM::ServiceLinkedRole
+    Properties:
+      AWSServiceName: ecs.amazonaws.com
+      Description: Role to enable Amazon ECS to manage your cluster
+
+# S3
+
+  codeRepoBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+      BucketName: !Join
+        - "-"
+        - - !Ref AWS::AccountId
+          - zerotrust
+          - coderepobucket
+          - Fn::Select: [0, Fn::Split: [-, Fn::Select: [2, Fn::Split: [/, !Ref AWS::StackId ]]]]
+      Tags: 
+        - Key: Name
+          Value: !Join
+            - ""
+            - - !Ref AWS::AccountId
+              - codeRepoBucket
+
+# DNS
+
+  microserviceRoute53Zone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      HostedZoneTags: 
+        - Key: Name
+          Value: !Join
+            - "."
+            - - !Ref AWS::AccountId
+              - !Ref ApplicationDomain
+      Name: !Join
+        - "."
+        - - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      VPCs: 
+        - VPCId: !Ref frontEndVPC
+          VPCRegion: !Ref AWS::Region
+        - VPCId: !Ref backEnd1VPC
+          VPCRegion: !Ref AWS::Region
+        - VPCId: !Ref backEnd2VPC
+          VPCRegion: !Ref AWS::Region
+        - VPCId: !Ref inspectionVPC
+          VPCRegion: !Ref AWS::Region
+
+
+# Transit Gateway Resources
+
+  regionalTgw:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      AmazonSideAsn: 65500
+      DefaultRouteTableAssociation: disable
+      DefaultRouteTablePropagation: disable
+      Description: Regional TGW
+      DnsSupport: enable
+      MulticastSupport: disable
+      Tags: 
+        - Key: Name
+          Value: regionalTGW
+
+  regionalTgwRouteTableServices:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: regionalTgwServices
+      TransitGatewayId: !Ref regionalTgw
+
+  regionalTgwRouteTableInspection:
+    Type: AWS::EC2::TransitGatewayRouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: regionalTgwInspection
+      TransitGatewayId: !Ref regionalTgw
+
+  regionalTgwAttachFrontEnd:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      Options:
+        ApplianceModeSupport: disable
+        DnsSupport: enable
+        Ipv6Support: enable
+      SubnetIds:
+        - !Ref frontEndTgwSub1
+        - !Ref frontEndTgwSub2
+      Tags: 
+        - Key: Name
+          Value: frontEnd Attachment
+      TransitGatewayId: !Ref regionalTgw
+      VpcId: !Ref frontEndVPC
+
+  regionalTgwAttachBackEnd1:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      Options:
+        ApplianceModeSupport: disable
+        DnsSupport: enable
+        Ipv6Support: enable
+      SubnetIds:
+        - !Ref backEnd1TgwSub1
+        - !Ref backEnd1TgwSub2
+      Tags: 
+        - Key: Name
+          Value: backEnd1 Attachment
+      TransitGatewayId: !Ref regionalTgw
+      VpcId: !Ref backEnd1VPC
+
+  regionalTgwAttachBackEnd2:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      Options:
+        ApplianceModeSupport: disable
+        DnsSupport: enable
+        Ipv6Support: enable
+      SubnetIds:
+        - !Ref backEnd2TgwSub1
+        - !Ref backEnd2TgwSub2
+      Tags: 
+        - Key: Name
+          Value: backEnd2 Attachment
+      TransitGatewayId: !Ref regionalTgw
+      VpcId: !Ref backEnd2VPC
+
+  regionalTgwAttachInspection:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      Options:
+        ApplianceModeSupport: enable
+        DnsSupport: enable
+        Ipv6Support: enable
+      SubnetIds:
+        - !Ref inspectionTgwSub1
+        - !Ref inspectionTgwSub2
+      Tags: 
+        - Key: Name
+          Value: inspection Attachment
+      TransitGatewayId: !Ref regionalTgw
+      VpcId: !Ref inspectionVPC
+
+  regionalTgwAssocFrontEnd:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachFrontEnd
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableServices
+
+  regionalTgwAssocBackEnd1:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachBackEnd1
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableServices
+
+  regionalTgwAssocBackEnd2:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachBackEnd2
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableServices
+
+  regionalTgwAssocInspection:
+    Type: AWS::EC2::TransitGatewayRouteTableAssociation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachInspection
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableInspection
+
+  regionalInspectionRoutev4:
+    Type: AWS::EC2::TransitGatewayRoute
+    Properties:
+      Blackhole: false
+      DestinationCidrBlock: 0.0.0.0/0
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachInspection
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableServices
+  
+  regionalInspectionRoutev6:
+    Type: AWS::EC2::TransitGatewayRoute
+    Properties:
+      Blackhole: false
+      DestinationCidrBlock: ::/0
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachInspection
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableServices
+
+  regionalInspectionPropgationFrontEnd:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachFrontEnd
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableInspection
+
+  regionalInspectionPropgationBackEnd1:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachBackEnd1
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableInspection
+
+  regionalInspectionPropgationBackEnd2:
+    Type: AWS::EC2::TransitGatewayRouteTablePropagation
+    Properties:
+      TransitGatewayAttachmentId: !Ref regionalTgwAttachBackEnd2
+      TransitGatewayRouteTableId: !Ref regionalTgwRouteTableInspection
+
+# VPC Resources
+## VPCs
+
+  frontEndVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap 
+        - Addressing
+        - frontEnd
+        - v4
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: 
+        - Key: Name
+          Value: frontEndVPC
+  
+  backEnd1VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap 
+        - Addressing
+        - backEnd1
+        - v4
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: 
+        - Key: Name
+          Value: backEnd1VPC
+
+  backEnd2VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap 
+        - Addressing
+        - backEnd2
+        - v4
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: 
+        - Key: Name
+          Value: backEnd2VPC
+
+  inspectionVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap 
+        - Addressing
+        - inspection
+        - v4
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: 
+        - Key: Name
+          Value: inspectionVPC
+
+## Gateways and Attachments
+
+  frontEndEogw:
+    Type: AWS::EC2::EgressOnlyInternetGateway
+    Properties:
+      VpcId: !Ref frontEndVPC
+
+  frontEndIgw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndIgw
+
+  frontEndIgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref frontEndIgw
+      VpcId: !Ref frontEndVPC
+
+  backEnd1Eogw:
+    Type: AWS::EC2::EgressOnlyInternetGateway
+    Properties:
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndIgw
+
+  backEnd1IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref backEnd1Igw
+      VpcId: !Ref backEnd1VPC
+
+  backEnd2Eogw:
+    Type: AWS::EC2::EgressOnlyInternetGateway
+    Properties:
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2Igw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndIgw
+
+  backEnd2IgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref backEnd2Igw
+      VpcId: !Ref backEnd2VPC
+
+  inspectionEogw:
+    Type: AWS::EC2::EgressOnlyInternetGateway
+    Properties:
+      VpcId: !Ref inspectionVPC
+
+  inspectionIgw:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndIgw
+
+  inspectionIgwAttach:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref inspectionIgw
+      VpcId: !Ref inspectionVPC
+
+  frontEndEipAlloc1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndEipAlloc1
+
+  frontEndEipAlloc2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndEipAlloc2
+
+  frontEndNatGw1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt frontEndEipAlloc1.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref frontEndPubSub1
+      Tags: 
+        - Key: Name
+          Value: frontEndNatGw1
+
+  frontEndNatGw2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt frontEndEipAlloc2.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref frontEndPubSub2
+      Tags: 
+        - Key: Name
+          Value: frontEndNatGw2
+
+  backEnd1EipAlloc1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1EipAlloc1
+
+  backEnd1EipAlloc2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1EipAlloc2
+
+  backEnd1NatGw1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt backEnd1EipAlloc1.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref backEnd1PubSub1
+      Tags: 
+        - Key: Name
+          Value: backEnd1NatGw1
+
+  backEnd1NatGw2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt backEnd1EipAlloc2.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref backEnd1PubSub2
+      Tags: 
+        - Key: Name
+          Value: backEnd1NatGw2
+
+  backEnd2EipAlloc1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2EipAlloc1
+
+  backEnd2EipAlloc2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2EipAlloc2
+
+  backEnd2NatGw1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt backEnd2EipAlloc1.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref backEnd2PubSub1
+      Tags: 
+        - Key: Name
+          Value: backEnd2NatGw1
+
+  backEnd2NatGw2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt backEnd2EipAlloc2.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref backEnd2PubSub2
+      Tags: 
+        - Key: Name
+          Value: backEnd2NatGw2
+
+  inspectionEipAlloc1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionEipAlloc1
+
+  inspectionEipAlloc2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionEipAlloc2
+
+  inspectionNatGw1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt inspectionEipAlloc1.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref inspectionPubSub1
+      Tags: 
+        - Key: Name
+          Value: inspectionNatGw1
+
+  inspectionNatGw2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt inspectionEipAlloc2.AllocationId
+      ConnectivityType: public
+      SubnetId: !Ref inspectionPubSub2
+      Tags: 
+        - Key: Name
+          Value: inspectionNatGw2
+
+## IPv6 Blocks
+
+  frontEndV6Block:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref frontEndVPC
+
+  backEnd1V6Block:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref backEnd1VPC
+
+  backEnd2V6Block:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref backEnd2VPC
+
+  inspectionV6Block:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      AmazonProvidedIpv6CidrBlock: true
+      VpcId: !Ref inspectionVPC
+
+##  Subnets
+
+  frontEndPubSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: frontEndV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 0, !Cidr [!GetAtt frontEndVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: frontEndPubSub1
+      VpcId: !Ref frontEndVPC
+
+  frontEndPubSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: frontEndV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 1, !Cidr [!GetAtt frontEndVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 1, !Cidr [ !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: frontEndPubSub2
+      VpcId: !Ref frontEndVPC
+
+  frontEndPrivSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: frontEndV6Block 
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 2, !Cidr [!GetAtt frontEndVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 2, !Cidr [ !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: frontEndPrivSub1
+      VpcId: !Ref frontEndVPC
+
+  frontEndPrivSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: frontEndV6Block  
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 3, !Cidr [!GetAtt frontEndVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 3, !Cidr [ !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: frontEndPrivSub2
+      VpcId: !Ref frontEndVPC
+
+  frontEndTgwSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: frontEndV6Block    
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 4, !Cidr [!GetAtt frontEndVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 4, !Cidr [ !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: frontEndTgwSub1
+      VpcId: !Ref frontEndVPC
+
+  frontEndTgwSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: frontEndV6Block    
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 5, !Cidr [!GetAtt frontEndVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 5, !Cidr [ !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: frontEndTgwSub2
+      VpcId: !Ref frontEndVPC
+
+  backEnd1PubSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd1V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 0, !Cidr [!GetAtt backEnd1VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd1PubSub1
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1PubSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd1V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 1, !Cidr [!GetAtt backEnd1VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 1, !Cidr [ !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd1PubSub2
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1PrivSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd1V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 2, !Cidr [!GetAtt backEnd1VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 2, !Cidr [ !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd1PrivSub1
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1PrivSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd1V6Block   
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 3, !Cidr [!GetAtt backEnd1VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 3, !Cidr [ !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd1PrivSub2
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1TgwSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd1V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 4, !Cidr [!GetAtt backEnd1VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 4, !Cidr [ !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd1TgwSub1
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1TgwSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd1V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 5, !Cidr [!GetAtt backEnd1VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 5, !Cidr [ !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd1TgwSub2
+      VpcId: !Ref backEnd1VPC
+
+  backEnd2PubSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd2V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 0, !Cidr [!GetAtt backEnd2VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt backEnd2VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd2PubSub1
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2PubSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd2V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 1, !Cidr [!GetAtt backEnd2VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 1, !Cidr [ !Select [ 0, !GetAtt backEnd2VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd2PubSub2
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2PrivSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd2V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 2, !Cidr [!GetAtt backEnd2VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 2, !Cidr [ !Select [ 0, !GetAtt backEnd2VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd2PrivSub1
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2PrivSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd2V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 3, !Cidr [!GetAtt backEnd2VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 3, !Cidr [ !Select [ 0, !GetAtt backEnd2VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd2PrivSub2
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2TgwSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd2V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 4, !Cidr [!GetAtt backEnd2VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 4, !Cidr [ !Select [ 0, !GetAtt backEnd2VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd2TgwSub1
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2TgwSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: backEnd2V6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 5, !Cidr [!GetAtt backEnd2VPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 5, !Cidr [ !Select [ 0, !GetAtt backEnd2VPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: backEnd2TgwSub2
+      VpcId: !Ref backEnd2VPC
+
+  inspectionPubSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: inspectionV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 0, !Cidr [!GetAtt inspectionVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 0, !Cidr [ !Select [ 0, !GetAtt inspectionVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: inspectionPubSub1
+      VpcId: !Ref inspectionVPC
+
+  inspectionPubSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: inspectionV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 1, !Cidr [!GetAtt inspectionVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 1, !Cidr [ !Select [ 0, !GetAtt inspectionVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: inspectionPubSub2
+      VpcId: !Ref inspectionVPC
+
+  inspectionPrivSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: inspectionV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 2, !Cidr [!GetAtt inspectionVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 2, !Cidr [ !Select [ 0, !GetAtt inspectionVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: inspectionPrivSub1
+      VpcId: !Ref inspectionVPC
+
+  inspectionPrivSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: inspectionV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 3, !Cidr [!GetAtt inspectionVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 3, !Cidr [ !Select [ 0, !GetAtt inspectionVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: inspectionPrivSub2
+      VpcId: !Ref inspectionVPC
+
+  inspectionTgwSub1:
+    Type: AWS::EC2::Subnet
+    DependsOn: inspectionV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      CidrBlock:  !Select [ 4, !Cidr [!GetAtt inspectionVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 4, !Cidr [ !Select [ 0, !GetAtt inspectionVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: inspectionTgwSub1
+      VpcId: !Ref inspectionVPC
+
+  inspectionTgwSub2:
+    Type: AWS::EC2::Subnet
+    DependsOn: inspectionV6Block
+    Properties:
+      AssignIpv6AddressOnCreation: true
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      CidrBlock:  !Select [ 5, !Cidr [!GetAtt inspectionVPC.CidrBlock, 6, 5 ]]
+      Ipv6CidrBlock: !Select [ 5, !Cidr [ !Select [ 0, !GetAtt inspectionVPC.Ipv6CidrBlocks], 6, 64 ]]
+      Tags: 
+        - Key: Name
+          Value: inspectionTgwSub2
+      VpcId: !Ref inspectionVPC
+
+## Route Tables
+
+  frontEndPubRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndPubRouteTable
+      VpcId: !Ref frontEndVPC
+  
+  frontEndPrivRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndPrivRouteTable1
+      VpcId: !Ref frontEndVPC
+
+  frontEndPrivRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndPrivRouteTable2
+      VpcId: !Ref frontEndVPC
+
+  frontEndTgwRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndTgwRouteTable1
+      VpcId: !Ref frontEndVPC
+
+  frontEndTgwRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: frontEndTgwRouteTable2
+      VpcId: !Ref frontEndVPC
+
+  backEnd1PubRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1PubRouteTable
+      VpcId: !Ref backEnd1VPC
+  
+  backEnd1PrivRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1PrivRouteTable1
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1PrivRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1PrivRouteTable2
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1TgwRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1TgwRouteTable1
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1TgwRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd1TgwRouteTable2
+      VpcId: !Ref backEnd1VPC
+
+  backEnd2PubRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2PubRouteTable
+      VpcId: !Ref backEnd2VPC
+  
+  backEnd2PrivRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2PrivRouteTable1
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2PrivRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2PrivRouteTable2
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2TgwRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2TgwRouteTable1
+      VpcId: !Ref backEnd2VPC
+
+  backEnd2TgwRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: backEnd2TgwRouteTable2
+      VpcId: !Ref backEnd2VPC
+
+  inspectionPubRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionPubRouteTable
+      VpcId: !Ref inspectionVPC
+  
+  inspectionPrivRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionPrivRouteTable1
+      VpcId: !Ref inspectionVPC
+
+  inspectionPrivRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionPrivRouteTable2
+      VpcId: !Ref inspectionVPC
+
+  inspectionTgwRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionTgwRouteTable1
+      VpcId: !Ref inspectionVPC
+
+  inspectionTgwRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags: 
+        - Key: Name
+          Value: inspectionTgwRouteTable2
+      VpcId: !Ref inspectionVPC
+
+## Route Table Associations
+
+  frontEndPubSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref frontEndPubRouteTable
+      SubnetId: !Ref frontEndPubSub1
+
+  frontEndPubSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref frontEndPubRouteTable
+      SubnetId: !Ref frontEndPubSub2
+
+  frontEndPrivSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref frontEndPrivRouteTable1
+      SubnetId: !Ref frontEndPrivSub1
+
+  frontEndPrivSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref frontEndPrivRouteTable2
+      SubnetId: !Ref frontEndPrivSub2
+
+  frontEndTgwSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref frontEndTgwRouteTable1
+      SubnetId: !Ref frontEndTgwSub1
+
+  frontEndTgwSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref frontEndTgwRouteTable2
+      SubnetId: !Ref frontEndTgwSub2
+
+  backEnd1PubSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd1PubRouteTable
+      SubnetId: !Ref backEnd1PubSub1
+
+  backEnd1PubSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd1PubRouteTable
+      SubnetId: !Ref backEnd1PubSub2
+
+  backEnd1PrivSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd1PrivRouteTable1
+      SubnetId: !Ref backEnd1PrivSub1
+
+  backEnd1PrivSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd1PrivRouteTable2
+      SubnetId: !Ref backEnd1PrivSub2
+
+  backEnd1TgwSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd1TgwRouteTable1
+      SubnetId: !Ref backEnd1TgwSub1
+
+  backEnd1TgwSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd1TgwRouteTable2
+      SubnetId: !Ref backEnd1TgwSub2
+
+  backEnd2PubSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd2PubRouteTable
+      SubnetId: !Ref backEnd2PubSub1
+
+  backEnd2PubSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd2PubRouteTable
+      SubnetId: !Ref backEnd2PubSub2
+
+  backEnd2PrivSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd2PrivRouteTable1
+      SubnetId: !Ref backEnd2PrivSub1
+
+  backEnd2PrivSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd2PrivRouteTable2
+      SubnetId: !Ref backEnd2PrivSub2
+
+  backEnd2TgwSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd2TgwRouteTable1
+      SubnetId: !Ref backEnd2TgwSub1
+
+  backEnd2TgwSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref backEnd2TgwRouteTable2
+      SubnetId: !Ref backEnd2TgwSub2
+
+  inspectionPubSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref inspectionPubRouteTable
+      SubnetId: !Ref inspectionPubSub1
+
+  inspectionPubSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref inspectionPubRouteTable
+      SubnetId: !Ref inspectionPubSub2
+
+  inspectionPrivSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref inspectionPrivRouteTable1
+      SubnetId: !Ref inspectionPrivSub1
+
+  inspectionPrivSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref inspectionPrivRouteTable2
+      SubnetId: !Ref inspectionPrivSub2
+
+  inspectionTgwSubnet1RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref inspectionTgwRouteTable1
+      SubnetId: !Ref inspectionTgwSub1
+
+  inspectionTgwSubnet2RouteTableAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref inspectionTgwRouteTable2
+      SubnetId: !Ref inspectionTgwSub2
+
+## VPC Route Table Entries
+
+  frontEndPubDefaultRoutev4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref frontEndPubRouteTable
+      GatewayId: !Ref frontEndIgw
+  
+  frontEndPubDefaultRoutev6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref frontEndPubRouteTable
+      GatewayId: !Ref frontEndIgw
+  
+  frontEndPrivDefaultRoute1v4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref frontEndPrivRouteTable1
+      NatGatewayId: !Ref frontEndNatGw1
+    
+  frontEndPrivDefaultRoute1v6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref frontEndPrivRouteTable1
+      EgressOnlyInternetGatewayId: !Ref frontEndEogw
+
+  frontEndPrivPlatformRoute1v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachFrontEnd
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref frontEndPrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+    
+  frontEndPrivPlatformRoute1v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachFrontEnd
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref frontEndPrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+
+  frontEndPrivPlatformRoute2v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachFrontEnd
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref frontEndPrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+    
+  frontEndPrivPlatformRoute2v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachFrontEnd
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref frontEndPrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+
+  frontEndPrivDefaultRoute2v4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref frontEndPrivRouteTable2
+      NatGatewayId: !Ref frontEndNatGw2
+    
+  frontEndPrivDefaultRoute2v6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref frontEndPrivRouteTable2
+      EgressOnlyInternetGatewayId: !Ref frontEndEogw
+
+  backEnd1PubDefaultRoutev4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref backEnd1PubRouteTable
+      GatewayId: !Ref backEnd1Igw
+  
+  backEnd1PubDefaultRoutev6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref backEnd1PubRouteTable
+      GatewayId: !Ref backEnd1Igw
+  
+  backEnd1PrivDefaultRoute1v4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref backEnd1PrivRouteTable1
+      NatGatewayId: !Ref backEnd1NatGw1
+    
+  backEnd1PrivDefaultRoute1v6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref backEnd1PrivRouteTable1
+      EgressOnlyInternetGatewayId: !Ref backEnd1Eogw
+
+  backEnd1PrivPlatformRoute1v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd1
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref backEnd1PrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+    
+  backEnd1PrivPlatformRoute1v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd1
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref backEnd1PrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+
+  backEnd1PrivPlatformRoute2v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd1
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref backEnd1PrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+    
+  backEnd1PrivPlatformRoute2v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd1
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref backEnd1PrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+
+  backEnd1PrivDefaultRoute2v4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref backEnd1PrivRouteTable2
+      NatGatewayId: !Ref backEnd1NatGw2
+    
+  backEnd1PrivDefaultRoute2v6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref backEnd1PrivRouteTable2
+      EgressOnlyInternetGatewayId: !Ref backEnd1Eogw
+
+  backEnd2PubDefaultRoutev4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref backEnd2PubRouteTable
+      GatewayId: !Ref backEnd2Igw
+  
+  backEnd2PubDefaultRoutev6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref backEnd2PubRouteTable
+      GatewayId: !Ref backEnd2Igw
+  
+  backEnd2PrivDefaultRoute1v4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref backEnd2PrivRouteTable1
+      NatGatewayId: !Ref backEnd2NatGw1
+    
+  backEnd2PrivDefaultRoute1v6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref backEnd2PrivRouteTable1
+      EgressOnlyInternetGatewayId: !Ref backEnd2Eogw
+
+  backEnd2PrivPlatformRoute1v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd2
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref backEnd2PrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+    
+  backEnd2PrivPlatformRoute1v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd2
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref backEnd2PrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+
+  backEnd2PrivPlatformRoute2v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd2
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref backEnd2PrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+    
+  backEnd2PrivPlatformRoute2v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachBackEnd2
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref backEnd2PrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+
+  backEnd2PrivDefaultRoute2v4:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref backEnd2PrivRouteTable2
+      NatGatewayId: !Ref backEnd2NatGw2
+    
+  backEnd2PrivDefaultRoute2v6:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationIpv6CidrBlock: ::/0
+      RouteTableId: !Ref backEnd2PrivRouteTable2
+      EgressOnlyInternetGatewayId: !Ref backEnd2Eogw
+
+## Applications
+# Code Fetchers
+
+  GitRepoToCodeCommitCustomResource:
+    Type: Custom::CopyGitRepoToS3
+    Properties:
+      ServiceToken: !GetAtt GitRepoToS3Lambda.Arn
+
+  GitRepoToS3LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub ${codeRepoBucket.Arn}/cloneFromGithub/*
+          PolicyName: PutS3Object
+
+  GitRepoToS3Lambda:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Description: Lambda to be triggered by Cloudformation Custom resource to copy GitHub repo to Amazon S3
+      Code: 
+        ZipFile: |
+          import boto3
+          import logging
+          import os
+          import shutil
+          import cfnresponse
+          s3 = boto3.client('s3')
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+          branch = 'reInvent'
+          repo = os.environ['GitRepo']
+          s3Bucket = os.environ['s3Bucket']
+          path = '/tmp/repo' 
+          s3ObjectName = 'zero-trust'
+          s3ObjectExtension = 'zip'
+          s3ObjectFullName = s3ObjectName + '.' + s3ObjectExtension
+          def lambda_handler(event, context):
+              response_data = {}
+              try:
+                  logger.info('Create path and change working directory to: %s' % (path))
+                  os.mkdir(path)
+                  os.chdir(path)
+                  logger.info('Clone the repository: %s to: %s' % (repo, path))
+                  os.system('git clone -b ' + branch + ' ' + repo + ' cloned-repo')
+                  shutil.rmtree('cloned-repo/.git')
+                  logger.info('Clone complete. Files in working directory:')
+                  logger.info(os.listdir(os.getcwd()))
+                  logger.info('Create Zip from repo')
+                  shutil.make_archive(s3ObjectName, s3ObjectExtension,'cloned-repo','.')
+                  logger.info('Created zip from repo. Files in working directory:')
+                  logger.info(os.listdir(os.getcwd()))
+                  logger.info('Uploading %s to S3://%s/%s' % (s3ObjectFullName, s3Bucket, 'cloneFromGithub/'+s3ObjectFullName))
+                  s3.upload_file(os.getcwd() + '/' + s3ObjectFullName, s3Bucket, 'cloneFromGithub/'+s3ObjectFullName)
+                  logger.info('Upload Complete. Cleaning directory')
+                  shutil.rmtree(path)
+                  cfnresponse.send(event, context, cfnresponse.SUCCESS, response_data)
+              except Exception as e:
+                  logger.error('Execution failed...')
+                  logger.error(str(e))
+                  response_data['Data'] = str(e)
+                  cfnresponse.send(event, context, cfnresponse.FAILED, response_data)
+      Environment: 
+        Variables:
+          GitRepo: !Ref GitRepo
+          s3Bucket: !Ref codeRepoBucket
+      Handler: index.lambda_handler
+      Runtime: python3.12
+      Layers: 
+        - !Sub arn:aws:lambda:${AWS::Region}:553035198032:layer:git-lambda2:8 # https://github.com/lambci/git-lambda-layer
+      MemorySize: 1024
+      Role: !GetAtt GitRepoToS3LambdaRole.Arn
+
+# Elastic Container Registries
+
+  frontEndEcrRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      EmptyOnDelete: true
+      Tags: 
+        - Key: Name
+          Value: frontEndEcrRepo
+
+  backEnd1EcrRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      EmptyOnDelete: true
+      Tags: 
+        - Key: Name
+          Value: backEnd1EcrRepo
+
+# *Code Roles and Resources
+
+  cPipelineCloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: cfnRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              -
+                Effect: Allow
+                Action: '*'
+                Resource: '*'
+
+  cPipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: 
+                Service: 
+                  - codepipeline.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: CodePipelineRolePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+                - Effect: Allow
+                  Action:
+                    - codebuild:StartBuild
+                    - codebuild:BatchGetBuilds
+                  Resource: 
+                    - !GetAtt frontEndBuildProject.Arn
+                    - !GetAtt backEnd1BuildProject.Arn
+                - Effect: Allow
+                  Action:
+                    - cloudformation:CreateStack
+                    - cloudformation:DeleteStack
+                    - cloudformation:DescribeStacks
+                    - cloudformation:UpdateStack
+                    - cloudformation:CreateChangeSet
+                    - cloudformation:DeleteChangeSet
+                    - cloudformation:DescribeChangeSet
+                    - cloudformation:ExecuteChangeSet
+                    - cloudformation:SetStackPolicy
+                    - cloudformation:ValidateTemplate
+                  Resource: "*"
+                - Effect: Allow
+                  Action:
+                    - iam:PassRole
+                  Resource:
+                    - !GetAtt cPipelineCloudFormationRole.Arn
+                - Effect: Allow
+                  Action:
+                    - s3:*
+                  Resource: 
+                    - !Sub ${codeRepoBucket.Arn}
+                    - !Sub ${codeRepoBucket.Arn}/*
+
+  cPipelineCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodebuildRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecr:PutImage
+                  - ecr:PutImageTagMutability
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchGetImage 
+                  - ecr:GetDownloadUrlForLayer
+                Resource:
+                  - !Sub ${frontEndEcrRepo.Arn}
+                  - !Sub ${backEnd1EcrRepo.Arn}
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter*
+                  - ssm:PutParameter
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/codebuild/*
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                Resource:
+                  - !Sub ${codeRepoBucket.Arn}
+                  - !Sub ${codeRepoBucket.Arn}/*
+
+  frontEndBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties: 
+      Artifacts: 
+        Type: CODEPIPELINE
+      Environment: 
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:4.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: true
+        ImagePullCredentialsType: CODEBUILD
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${frontEndEcrRepo}
+      LogsConfig: 
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: codebuild
+      ServiceRole: !GetAtt cPipelineCodeBuildRole.Arn
+      Source: 
+        Type: CODEPIPELINE
+        BuildSpec: zero-trust/applications/portal/buildspec.yml
+
+  backEnd1BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties: 
+      Artifacts: 
+        Type: CODEPIPELINE
+      Environment: 
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:4.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: true
+        ImagePullCredentialsType: CODEBUILD
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Type: PLAINTEXT
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Type: PLAINTEXT
+            Value: !Ref AWS::AccountId
+          - Name: IMAGE_REPO_NAME
+            Type: PLAINTEXT
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${backEnd1EcrRepo}
+      LogsConfig: 
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: codebuild
+      ServiceRole: !GetAtt cPipelineCodeBuildRole.Arn
+      Source: 
+        Type: CODEPIPELINE
+        BuildSpec: zero-trust/applications/mservice1/buildspec.yml
+
+  cPipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties: 
+      ArtifactStore: 
+        Type: S3 
+        Location: !Ref codeRepoBucket
+      Name: !Sub ${AWS::StackName}-pipeline
+      RoleArn: !GetAtt cPipelineServiceRole.Arn
+      Stages:
+      - Name: SourceStage
+        Actions:
+          - Name: Source
+            ActionTypeId:
+              Category: Source
+              Owner: AWS
+              Provider: S3
+              Version: '1'
+            Configuration:
+              S3Bucket: !Ref codeRepoBucket
+              S3ObjectKey: cloneFromGithub/zero-trust.zip
+              PollForSourceChanges: 'false'
+            OutputArtifacts:
+              - Name: SourceArtifact
+            RunOrder: 1
+      - Name: BuildStage
+        Actions:
+          - Name: BuildFrontEnd
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref frontEndBuildProject
+            InputArtifacts:
+              - Name: SourceArtifact
+            Namespace: FrontEndDockerDeploy
+          - Name: BuildBackEnd1
+            ActionTypeId:
+              Category: Build
+              Owner: AWS
+              Provider: CodeBuild
+              Version: '1'
+            Configuration:
+              ProjectName: !Ref backEnd1BuildProject
+            InputArtifacts:
+              - Name: SourceArtifact
+            Namespace: BackEnd1DockerDeploy
+
+# Front End Appliction (Portal)
+
+  frontEndIntALBTGroup80:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 5
+      HealthCheckTimeoutSeconds: 2
+      HealthyThresholdCount: 3
+      HealthCheckPath: /health
+      IpAddressType: ipv4
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref frontEndVPC
+
+  frontEndIntALB:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      IpAddressType: dualstack
+      Scheme: internal
+      Subnets:
+        - !Ref frontEndPrivSub1
+        - !Ref frontEndPrivSub2
+      Type: application
+
+  frontEndIntALBListener80:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref frontEndIntALBTGroup80
+          Type: forward
+      LoadBalancerArn: !Ref frontEndIntALB
+      Port: 80
+      Protocol: HTTP
+
+  frontEndLogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/${frontEndCluster}'
+
+  frontEndCluster:
+    Type: 'AWS::ECS::Cluster'
+    DependsOn: 
+      - ecsServiceLinkedRole
+      - cPipeline
+    Properties:
+      CapacityProviders:
+        - FARGATE
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  frontEndTaskExecRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ecs-actions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'ssmmessages:CreateControlChannel'
+                  - 'ssmmessages:CreateDataChannel'
+                  - 'ssmmessages:OpenControlChannel'
+                  - 'ssmmessages:OpenDataChannel'
+                Resource: '*'
+
+  frontEndTaskRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ecs-actions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssmmessages:CreateControlChannel'
+                  - 'ssmmessages:CreateDataChannel'
+                  - 'ssmmessages:OpenControlChannel'
+                  - 'ssmmessages:OpenDataChannel'
+                Resource: '*'
+
+  frontEndSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref frontEndVPC
+      GroupDescription: Nginx Security group
+      SecurityGroupIngress:
+        - CidrIp: !GetAtt frontEndVPC.CidrBlock
+          IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          Description: Ingress rule for tcp 80
+        - CidrIpv6: !Select [ 0, !GetAtt frontEndVPC.Ipv6CidrBlocks]
+          IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          Description: Ingress rule for tcp 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+          FromPort: -1
+          ToPort: -1
+      Tags:
+        - Key: Name
+          Value: FrontEnd SG
+
+  frontEndTask:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties: 
+      ExecutionRoleArn: !Ref frontEndTaskExecRole
+      NetworkMode: awsvpc
+      ContainerDefinitions:
+        - Image: !Join
+          - ''
+          - - !GetAtt frontEndEcrRepo.RepositoryUri
+            - ':latest'
+          Name: frontEnd
+          PortMappings:
+            - ContainerPort: 8080
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-group: !Ref frontEndLogGroup
+              awslogs-stream-prefix: portal
+          Environment:
+            - Name: DNSFrontEnd
+              Value: !Join
+                - "."
+                - - frontend
+                  - !Ref AWS::AccountId
+                  - !Ref ApplicationDomain 
+            - Name: DNSBackEnd1
+              Value:  !Join
+                - "."
+                - - mservice1
+                  - !Ref AWS::AccountId
+                  - !Ref ApplicationDomain 
+            - Name: DNSBackEnd2
+              Value:  !Join
+                - "."
+                - - mservice2
+                  - !Ref AWS::AccountId
+                  - !Ref ApplicationDomain
+      Cpu: 2048
+      Memory: 4096
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      TaskRoleArn: !Ref frontEndTaskRole
+
+  frontEndService:
+    Type: 'AWS::ECS::Service'
+    DependsOn:
+      - frontEndIntALBListener80
+      - frontEndIntALBListener80
+    Properties:
+      Cluster: !Ref frontEndCluster
+      DesiredCount: 2
+      EnableExecuteCommand: true
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: frontEnd
+          ContainerPort: 8080
+          TargetGroupArn: !Ref frontEndIntALBTGroup80
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref frontEndSecurityGroup
+          Subnets:
+            - !Ref frontEndPrivSub1
+            - !Ref frontEndPrivSub2
+      SchedulingStrategy: REPLICA
+      TaskDefinition: !Ref frontEndTask
+
+# BackEnd1 Application (merservice1)
+
+  backEnd1IntALBTGroup80:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 5
+      HealthCheckTimeoutSeconds: 2
+      HealthyThresholdCount: 3
+      HealthCheckPath: /health
+      IpAddressType: ipv4
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref backEnd1VPC
+
+  backEnd1IntALB:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      IpAddressType: dualstack
+      Scheme: internal
+      Subnets:
+        - !Ref backEnd1PrivSub1
+        - !Ref backEnd1PrivSub2
+      Type: application
+
+  backEnd1IntALBListener80:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref backEnd1IntALBTGroup80
+          Type: forward
+      LoadBalancerArn: !Ref backEnd1IntALB
+      Port: 80
+      Protocol: HTTP
+
+  backEnd1LogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/${backEnd1Cluster}'
+
+  backEnd1Cluster:
+    Type: 'AWS::ECS::Cluster'
+    DependsOn: 
+      - ecsServiceLinkedRole
+      - cPipeline
+    Properties:
+      CapacityProviders:
+        - FARGATE
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+
+  backEnd1TaskExecRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ecs-actions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecr:GetAuthorizationToken'
+                  - 'ecr:BatchCheckLayerAvailability'
+                  - 'ecr:GetDownloadUrlForLayer'
+                  - 'ecr:BatchGetImage'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'ssmmessages:CreateControlChannel'
+                  - 'ssmmessages:CreateDataChannel'
+                  - 'ssmmessages:OpenControlChannel'
+                  - 'ssmmessages:OpenDataChannel'
+                Resource: '*'
+
+  backEnd1TaskRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ecs-actions
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssmmessages:CreateControlChannel'
+                  - 'ssmmessages:CreateDataChannel'
+                  - 'ssmmessages:OpenControlChannel'
+                  - 'ssmmessages:OpenDataChannel'
+                Resource: '*'
+
+  backEnd1SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref backEnd1VPC
+      GroupDescription: Nginx Security group
+      SecurityGroupIngress:
+        - CidrIp: !GetAtt backEnd1VPC.CidrBlock
+          IpProtocol: tcp
+          FromPort: 8081
+          ToPort: 8081
+          Description: Ingress rule for tcp 80
+        - CidrIpv6: !Select [ 0, !GetAtt backEnd1VPC.Ipv6CidrBlocks]
+          IpProtocol: tcp
+          FromPort: 8081
+          ToPort: 8081
+          Description: Ingress rule for tcp 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+          FromPort: -1
+          ToPort: -1
+      Tags:
+        - Key: Name
+          Value: FrontEnd SG
+
+  backEnd1Task:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties:
+      ExecutionRoleArn: !Ref backEnd1TaskExecRole
+      NetworkMode: awsvpc
+      ContainerDefinitions:
+        - Image: !Join
+          - ''
+          - - !GetAtt backEnd1EcrRepo.RepositoryUri
+            - ':latest'
+          Name: backEnd1
+          PortMappings:
+            - ContainerPort: 8081
+              Protocol: tcp
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref 'AWS::Region'
+              awslogs-group: !Ref backEnd1LogGroup
+              awslogs-stream-prefix: mervice1
+          Environment:
+            - Name: DNSFrontEnd
+              Value: !Join
+                - "."
+                - - frontend
+                  - !Ref AWS::AccountId
+                  - !Ref ApplicationDomain 
+            - Name: DNSBackEnd1
+              Value:  !Join
+                - "."
+                - - mservice1
+                  - !Ref AWS::AccountId
+                  - !Ref ApplicationDomain 
+            - Name: DNSBackEnd2
+              Value:  !Join
+                - "."
+                - - mservice2
+                  - !Ref AWS::AccountId
+                  - !Ref ApplicationDomain
+      Cpu: 2048
+      Memory: 4096
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      TaskRoleArn: !Ref backEnd1TaskRole
+
+  backEnd1Service:
+    Type: 'AWS::ECS::Service'
+    DependsOn:
+      - backEnd1IntALBListener80
+      - backEnd1IntALBListener80
+    Properties:
+      Cluster: !Ref backEnd1Cluster
+      DesiredCount: 2
+      EnableExecuteCommand: true
+      LaunchType: FARGATE
+      LoadBalancers:
+        - ContainerName: backEnd1
+          ContainerPort: 8081
+          TargetGroupArn: !Ref backEnd1IntALBTGroup80
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          SecurityGroups:
+            - !Ref backEnd1SecurityGroup
+          Subnets:
+            - !Ref backEnd1PrivSub1
+            - !Ref backEnd1PrivSub2
+      SchedulingStrategy: REPLICA
+      TaskDefinition: !Ref backEnd1Task
+
+# BackEnd1 Application (merservice2)
+  
+  backEnd2ALBLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt backEnd2Lambda.Arn
+      Principal: elasticloadbalancing.amazonaws.com
+
+  backEnd2LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  backEnd2LogGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: backEnd2Lambda
+
+  backEnd2Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code: 
+        ZipFile: |
+          # Import Modules
+          import json
+
+          def lambda_handler(event, context):
+              
+              # Obtaining headers and requestContent from event
+              headers = event['headers']
+              requestContext = event['requestContext']
+              output = dict(**headers, **requestContext)
+
+              if event['path'] == "/":
+                  
+                  body = json.loads(event['body'])
+
+                  data = {
+                      'app2message'       :   'Welcome to the mservice2 - this is a simple open API',
+                      'app2information'   :   'Make a connection to the secure endpoint for secrets',
+                      'app2headers'       :   output
+                  }
+              
+                  if body['portalidname'] == 'Anonymous':
+                      resp = 418
+                  else:
+                      resp = 200
+                  
+                  return {
+                      'statusCode': resp,
+                      'body': json.dumps(data)
+                  }
+              
+              else:
+              
+              ### Check for Connection Type
+            
+                  body = json.loads(event['body'])
+            
+                  if "x-amz-content-sha256" in headers and body['portalidname'] != 'Anonymous':
+                      
+                      resp = 200
+                      data = {
+                          'app2secmessage'        :   'Welcome to the mservice2(secure) - this contains important feline information',
+                          'app2secinformation'    :   'A word on feline capabilities',
+                          'app2secdetails'        :   'Cats can jump 5 times their own height',
+                          'app2secheaders'        :   output
+                          }
+                  else:
+                      resp = 418
+                      data = {
+                          'app2secmessage'        :   'Welcome to the mservice2(secure) - this contains important feline information',
+                          'app2secinformation'    :   '[For more info, sign your requests]',
+                          'app2secdetails'        :   '[For more info, sign your requests]',
+                          'app2secheaders'        :   output
+                      }
+              
+                  return {
+                      'statusCode': resp,
+                      'body': json.dumps(data)
+                  }
+      Description: Microservice2 Lambda Function
+      LoggingConfig:
+        LogGroup: !Ref backEnd2LogGroup
+      Handler: index.lambda_handler
+      MemorySize: 1024
+      Role: !GetAtt backEnd2LambdaRole.Arn
+      Runtime: python3.12
+      Tags: 
+        - Key: Name
+          Value: mservice2Lambda
+
+  backEnd2IntALBTGroup80:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    DependsOn: backEnd2ALBLambdaPermission
+    Properties:
+      Targets:
+        - Id: !GetAtt backEnd2Lambda.Arn
+      TargetType: lambda
+
+  backEnd2IntALB:
+    Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
+    Properties:
+      IpAddressType: dualstack
+      Scheme: internal
+      Subnets:
+        - !Ref backEnd2PrivSub1
+        - !Ref backEnd2PrivSub2
+      Type: application
+
+  backEnd2IntALBListener80:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref backEnd2IntALBTGroup80
+          Type: forward
+      LoadBalancerArn: !Ref backEnd2IntALB
+      Port: 80
+      Protocol: HTTP
