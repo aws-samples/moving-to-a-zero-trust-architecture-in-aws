@@ -1667,7 +1667,7 @@ Resources:
       ServiceRole: !GetAtt cPipelineCodeBuildRole.Arn
       Source: 
         Type: CODEPIPELINE
-        BuildSpec: zero-trust/applications/portal/buildspec.yml
+        BuildSpec: applications/portal/buildspec.yml
 
   backEnd1BuildProject:
     Type: AWS::CodeBuild::Project
@@ -1697,7 +1697,7 @@ Resources:
       ServiceRole: !GetAtt cPipelineCodeBuildRole.Arn
       Source: 
         Type: CODEPIPELINE
-        BuildSpec: zero-trust/applications/mservice1/buildspec.yml
+        BuildSpec: applications/mservice1/buildspec.yml
 
   cPipeline:
     Type: AWS::CodePipeline::Pipeline
