@@ -81,6 +81,120 @@ Resources:
         - VPCId: !Ref inspectionVPC
           VPCRegion: !Ref AWS::Region
 
+  frontEndAliasV4:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt
+          - frontEndIntALB
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt
+          - frontEndIntALB
+          - CanonicalHostedZoneID
+      HostedZoneId: !Ref microserviceRoute53Zone
+      Name: !Join
+        - "."
+        - - portal
+          - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      Type: A
+
+  frontEndAliasV6:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt
+          - frontEndIntALB
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt
+          - frontEndIntALB
+          - CanonicalHostedZoneID
+      HostedZoneId: !Ref microserviceRoute53Zone
+      Name: !Join
+        - "."
+        - - portal
+          - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      Type: AAAA
+
+  backEndA1liasV4:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt
+          - backEnd1IntALB
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt
+          - backEnd1IntALB
+          - CanonicalHostedZoneID
+      HostedZoneId: !Ref microserviceRoute53Zone
+      Name: !Join
+        - "."
+        - - mservice1
+          - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      Type: A
+
+  backEnd1AliasV6:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt
+          - backEnd1IntALB
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt
+          - backEnd1IntALB
+          - CanonicalHostedZoneID
+      HostedZoneId: !Ref microserviceRoute53Zone
+      Name: !Join
+        - "."
+        - - mservice1
+          - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      Type: AAAA
+
+  backEnd2AliasV4:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt
+          - backEnd2IntALB
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt
+          - backEnd2IntALB
+          - CanonicalHostedZoneID
+      HostedZoneId: !Ref microserviceRoute53Zone
+      Name: !Join
+        - "."
+        - - mservice2
+          - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      Type: A
+
+  backEnd2AliasV6:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      AliasTarget:
+        DNSName: !GetAtt
+          - backEnd2IntALB
+          - DNSName
+        EvaluateTargetHealth: true
+        HostedZoneId: !GetAtt
+          - backEnd2IntALB
+          - CanonicalHostedZoneID
+      HostedZoneId: !Ref microserviceRoute53Zone
+      Name: !Join
+        - "."
+        - - mservice2
+          - !Ref AWS::AccountId
+          - !Ref ApplicationDomain
+      Type: AAAA
+
 ## Transit Gateway Resources
 
   regionalTgw:
@@ -2387,3 +2501,207 @@ Resources:
       LoadBalancerArn: !Ref backEnd2IntALB
       Port: 80
       Protocol: HTTP
+
+## AWS Network Firewall
+
+  # inspectionFirewall:
+  #   Type: AWS::NetworkFirewall::Firewall::Firewall
+  #   Properties:
+  #     FirewallName: !Join
+  #       - '-'
+  #       - - anfw
+  #         - !Ref AWS::StackName
+  #     Description: AWS Network Firewall resource
+  #     FirewallPolicyArn: !Ref inspectionFirewallPolicy
+  #     VpcId: !Ref inspectionVPC
+  #     SubnetMappings:
+  #       - IPAddressType: DUALSTACK
+  #         SubnetId: !Ref inspectionPrivSub1
+  #       - IPAddressType: DUALSTACK
+  #         SubnetId: !Ref inspectionPrivSub2
+  
+  # inspectionFirewallPolicy:
+  #   Type: AWS::NetworkFirewall::Firewall::FirewallPolicy
+  #   Properties:
+  #     FirewallPolicyName: !Join
+  #       - '-'
+  #       - - anfw-policy
+  #         - !Ref AWS::StackName
+  #     Description: AWS Network Firewall policy
+  #     FirewallPolicy:
+  #       StatelessDefaultActions:
+  #         - aws:forward_to_sfe
+  #       StatelessFragmentDefaultActions:
+  #         - aws:forward_to_sfe
+  #       StatefulEngineOptions:
+  #         RuleOrder: STRICT_ORDER
+  #       StatefulDefaultActions:
+  #         - aws:drop_strict
+  #         - aws:alert_strict
+  #       StatefulRuleGroupReferences:
+  #         - Priority: 10
+  #           ResourceArn: !Ref inspectionFirewallRuleGroupAllowDomains
+
+  inspectionFirewallRuleGroupAllowDomains:
+    Type: AWS::NetworkFirewall::Firewall::RuleGroup
+    Properties:
+      RuleGroupName: !Join
+        - '-'
+        - - allow-domains
+          - !Ref AWS::StackName
+      Description: Allowing set of domains (stateful)
+      Capacity: 50
+      Type: STATEFUL
+      RuleGroup:
+        RulesSource:
+          RulesString: |
+            pass tcp any any <> $EXTERNAL_NET 443 (msg:"Allowing TCP on port 443"; flow:not_established; sid:892123; rev:1;)
+            pass http any any -> $EXTERNAL_NET 80 (msg:"Allowing HTTP on port 80"; sid:892125; rev:1;)
+            pass tls any any -> $EXTERNAL_NET 443 (tls.sni; dotprefix; content:".amazon.com"; endswith; msg:"Allowing .amazon.com HTTPS requests"; sid:892126; rev:1;)
+        StatefulRuleOptions:
+          RuleOrder: STRICT_ORDER
+
+## Inject supernet routes for services CIDRs into VPC Route Tables
+  # 'Fn::ForEach::FirewallRoutes':
+  #   - AvailabilityZone
+  #   - ["1", "2"]
+  #   - 'RouteEntryv4${AvailabilityZone}':
+  #       Type: Custom::RouteTableEntry
+  #       DependsOn: FunctionLogGroup
+  #       Properties:
+  #         ServiceToken: !GetAtt FirewallRouteFunction.Arn
+  #         FirewallArn: !GetAtt inspectionFirewall.FirewallArn
+  #         SubnetAz: !GetAtt 
+  #           - !Sub inspectionVPCPrivSub${AvailabilityZone}
+  #           - AvailabilityZone
+  #         DestinationCidr: !FindInMap [  VPCs, CIDRs, supernetv4 ]
+  #         RouteTableId: !Ref 
+  #           'Fn::Sub': 'inspectionTGWRouteTable${AvailabilityZone}'
+  #     'RouteEntryv6${AvailabilityZone}':
+  #       Type: Custom::RouteTableEntry
+  #       DependsOn: FunctionLogGroup
+  #       Properties:
+  #         ServiceToken: !GetAtt FirewallRouteFunction.Arn
+  #         FirewallArn: !GetAtt inspectionFirewall.FirewallArn
+  #         SubnetAz: !GetAtt 
+  #           - !Sub inspectionVPCPrivSub${AvailabilityZone}
+  #           - AvailabilityZone
+  #         DestinationCidr: !FindInMap [  VPCs, CIDRs, supernetv6 ]
+  #         RouteTableId: !Ref 
+  #           'Fn::Sub': 'inspectionTGWRouteTable${AvailabilityZone}'
+
+## IAM Role (Lambda function)
+
+  # RouteFunctionRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service:
+  #               - lambda.amazonaws.com
+  #           Action:
+  #             - sts:AssumeRole
+  #     Policies:
+  #       - PolicyName: AllowLambdaVPC
+  #         PolicyDocument:
+  #           Version: "2012-10-17"
+  #           Statement:
+  #             - Effect: Allow
+  #               Action:
+  #                 - ec2:CreateRoute
+  #                 - ec2:UpdateRoute
+  #                 - ec2:DeleteRoute
+  #               Resource:
+  #                 - !Sub arn:aws:ec2:*:*:route-table/*
+  #             - Effect: Allow
+  #               Action:
+  #                 - network-firewall:DescribeFirewall
+  #               Resource:
+  #                 - !GetAtt inspectionFirewall.FirewallArn
+  #     ManagedPolicyArns:
+  #       - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+
+## CloudWach Log Group
+
+  # FunctionLogGroup:
+  #   Type: AWS::Logs::LogGroup
+  #   Properties:
+  #     LogGroupName: !Sub '/aws/lambda/${FirewallRouteFunction}'
+  #     RetentionInDays: 7
+
+
+## Lambda function
+
+  # FirewallRouteFunction:
+  #   Type: AWS::Lambda::Function
+  #   Properties:
+  #     Description: Manage VPC routes to Network Firewall endpoints
+  #     Runtime: python3.9
+  #     Timeout: 10
+  #     Role: !GetAtt RouteFunctionRole.Arn
+  #     Handler: index.on_event
+  #     Code:
+  #       ZipFile: |-
+  #         import logging
+  #         from typing import Dict
+  #         import boto3
+  #         import cfnresponse
+
+  #         logger = logging.getLogger(__name__)
+
+  #         nfw = boto3.client("network-firewall")
+  #         ec2 = boto3.client("ec2")
+  #         response = {}
+
+  #         def get_data(firewall_arn: str) -> Dict[str, str]:
+  #             response = nfw.describe_firewall(FirewallArn=firewall_arn)
+  #             return {
+  #                 k: v["Attachment"]["EndpointId"]
+  #                 for k, v in response["FirewallStatus"]["SyncStates"].items()
+  #             }
+
+  #         def create(event):
+  #             logical_id: str = event["LogicalResourceId"]
+  #             request_id: str = event["RequestId"]
+  #             physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
+  #             firewall_arn = event["ResourceProperties"]["FirewallArn"]
+  #             subnet_az = event["ResourceProperties"]["SubnetAz"]
+  #             destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+  #             route_table_id = event["ResourceProperties"]["RouteTableId"]
+
+  #             endpoints = get_data(firewall_arn)
+  #             ec2.create_route(
+  #                 DestinationCidrBlock=destination_cidr,
+  #                 RouteTableId=route_table_id,
+  #                 VpcEndpointId=endpoints[subnet_az],
+  #             )
+  #             return physical_resource_id
+
+  #         def update(event):
+  #             logical_id: str = event["LogicalResourceId"]
+  #             request_id: str = event["RequestId"]
+  #             physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
+  #             return physical_resource_id
+
+  #         def delete(event):
+  #             route_table_id = event["ResourceProperties"]["RouteTableId"]
+  #             destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+  #             ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
+
+  #         def on_event(event, context):
+  #           if event["RequestType"] == "Create":
+  #             physical_resource_id = create(event)
+  #             cfnresponse.send(event,context,cfnresponse.SUCCESS, {})
+  #             return
+  #           elif event["RequestType"] == "Update":
+  #             update(event),
+  #             cfnresponse.send(event,context, cfnresponse.SUCCESS, {})
+  #             return
+  #           elif event["RequestType"] == "Delete":
+  #             delete(event)
+  #             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+  #             return
