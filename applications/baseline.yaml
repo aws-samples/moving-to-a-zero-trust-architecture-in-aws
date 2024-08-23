@@ -1750,6 +1750,37 @@ Resources:
 
 # Front End Appliction (Portal)
 
+  frontEndIntALBSecGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref frontEndVPC
+      GroupDescription: Front End Security group
+      SecurityGroupIngress:
+        - CidrIp: !FindInMap 
+          - Addressing
+          - supernet
+          - v4
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: Ingress rule for tcp 80
+        - CidrIpv6: !FindInMap 
+          - Addressing
+          - supernet
+          - v6
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: Ingress rule for tcp 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+          FromPort: -1
+          ToPort: -1
+      Tags:
+        - Key: Name
+          Value: FrontEnd ALB SG
+
   frontEndIntALBTGroup80:
     Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
     Properties:
@@ -1769,6 +1800,8 @@ Resources:
     Properties:
       IpAddressType: dualstack
       Scheme: internal
+      SecurityGroups:
+        - !Ref frontEndIntALBSecGroup      
       Subnets:
         - !Ref frontEndPrivSub1
         - !Ref frontEndPrivSub2
@@ -1857,11 +1890,11 @@ Resources:
                   - 'ssmmessages:OpenDataChannel'
                 Resource: '*'
 
-  frontEndSecurityGroup:
+  frontEndContainerSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       VpcId: !Ref frontEndVPC
-      GroupDescription: Nginx Security group
+      GroupDescription: Front End Container Security group
       SecurityGroupIngress:
         - CidrIp: !GetAtt frontEndVPC.CidrBlock
           IpProtocol: tcp
@@ -1880,7 +1913,7 @@ Resources:
           ToPort: -1
       Tags:
         - Key: Name
-          Value: FrontEnd SG
+          Value: FrontEnd Container SG
 
   frontEndTask:
     Type: 'AWS::ECS::TaskDefinition'
@@ -1947,7 +1980,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
-            - !Ref frontEndSecurityGroup
+            - !Ref frontEndContainerSecurityGroup
           Subnets:
             - !Ref frontEndPrivSub1
             - !Ref frontEndPrivSub2
@@ -1955,6 +1988,37 @@ Resources:
       TaskDefinition: !Ref frontEndTask
 
 # BackEnd1 Application (merservice1)
+
+  backEnd1IntALBSecGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref backEnd1VPC
+      GroupDescription: Back End 1 Security group
+      SecurityGroupIngress:
+        - CidrIp: !FindInMap 
+          - Addressing
+          - supernet
+          - v4
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: Ingress rule for tcp 80
+        - CidrIpv6: !FindInMap 
+          - Addressing
+          - supernet
+          - v6
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: Ingress rule for tcp 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+          FromPort: -1
+          ToPort: -1
+      Tags:
+        - Key: Name
+          Value: BackEnd1 ALB SG
 
   backEnd1IntALBTGroup80:
     Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
@@ -1975,6 +2039,8 @@ Resources:
     Properties:
       IpAddressType: dualstack
       Scheme: internal
+      SecurityGroups:
+        - !Ref backEnd1IntALBSecGroup
       Subnets:
         - !Ref backEnd1PrivSub1
         - !Ref backEnd1PrivSub2
@@ -2063,11 +2129,11 @@ Resources:
                   - 'ssmmessages:OpenDataChannel'
                 Resource: '*'
 
-  backEnd1SecurityGroup:
+  backEnd1ContainerSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       VpcId: !Ref backEnd1VPC
-      GroupDescription: Nginx Security group
+      GroupDescription: Back End Container Security group
       SecurityGroupIngress:
         - CidrIp: !GetAtt backEnd1VPC.CidrBlock
           IpProtocol: tcp
@@ -2086,7 +2152,7 @@ Resources:
           ToPort: -1
       Tags:
         - Key: Name
-          Value: FrontEnd SG
+          Value: BackEnd1 Container SG
 
   backEnd1Task:
     Type: 'AWS::ECS::TaskDefinition'
@@ -2153,7 +2219,7 @@ Resources:
       NetworkConfiguration:
         AwsvpcConfiguration:
           SecurityGroups:
-            - !Ref backEnd1SecurityGroup
+            - !Ref backEnd1ContainerSecurityGroup
           Subnets:
             - !Ref backEnd1PrivSub1
             - !Ref backEnd1PrivSub2
@@ -2161,7 +2227,38 @@ Resources:
       TaskDefinition: !Ref backEnd1Task
 
 # BackEnd1 Application (merservice2)
-  
+
+  backEnd2IntALBSecGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref backEnd2VPC
+      GroupDescription: Back End 2 Security group
+      SecurityGroupIngress:
+        - CidrIp: !FindInMap 
+          - Addressing
+          - supernet
+          - v4
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: Ingress rule for tcp 80
+        - CidrIpv6: !FindInMap 
+          - Addressing
+          - supernet
+          - v6
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          Description: Ingress rule for tcp 80
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: '-1'
+          FromPort: -1
+          ToPort: -1
+      Tags:
+        - Key: Name
+          Value: BackEnd2 ALB SG
+
   backEnd2ALBLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -2274,6 +2371,8 @@ Resources:
     Properties:
       IpAddressType: dualstack
       Scheme: internal
+      SecurityGroups:
+        - !Ref backEnd2IntALBSecGroup
       Subnets:
         - !Ref backEnd2PrivSub1
         - !Ref backEnd2PrivSub2
