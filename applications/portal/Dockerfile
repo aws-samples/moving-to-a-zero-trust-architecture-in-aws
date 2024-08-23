@@ -1,4 +1,4 @@
-FROM amazonlinux:latest
+FROM public.ecr.aws/amazonlinux/amazonlinux:latest
 LABEL Name=portal Version=0.0.1
 RUN yum update -y && \ 
     yum install -y python3-pip net-tools bind-utils iputils

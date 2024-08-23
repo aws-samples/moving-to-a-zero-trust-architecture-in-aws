@@ -2502,48 +2502,48 @@ Resources:
       Port: 80
       Protocol: HTTP
 
-## AWS Network Firewall
+#AWS Network Firewall
 
-  # inspectionFirewall:
-  #   Type: AWS::NetworkFirewall::Firewall::Firewall
-  #   Properties:
-  #     FirewallName: !Join
-  #       - '-'
-  #       - - anfw
-  #         - !Ref AWS::StackName
-  #     Description: AWS Network Firewall resource
-  #     FirewallPolicyArn: !Ref inspectionFirewallPolicy
-  #     VpcId: !Ref inspectionVPC
-  #     SubnetMappings:
-  #       - IPAddressType: DUALSTACK
-  #         SubnetId: !Ref inspectionPrivSub1
-  #       - IPAddressType: DUALSTACK
-  #         SubnetId: !Ref inspectionPrivSub2
+  inspectionFirewall:
+    Type: AWS::NetworkFirewall::Firewall
+    Properties:
+      FirewallName: !Join
+        - '-'
+        - - anfw
+          - !Ref AWS::StackName
+      Description: AWS Network Firewall resource
+      FirewallPolicyArn: !Ref inspectionFirewallPolicy
+      VpcId: !Ref inspectionVPC
+      SubnetMappings:
+        - IPAddressType: DUALSTACK
+          SubnetId: !Ref inspectionPrivSub1
+        - IPAddressType: DUALSTACK
+          SubnetId: !Ref inspectionPrivSub2
   
-  # inspectionFirewallPolicy:
-  #   Type: AWS::NetworkFirewall::Firewall::FirewallPolicy
-  #   Properties:
-  #     FirewallPolicyName: !Join
-  #       - '-'
-  #       - - anfw-policy
-  #         - !Ref AWS::StackName
-  #     Description: AWS Network Firewall policy
-  #     FirewallPolicy:
-  #       StatelessDefaultActions:
-  #         - aws:forward_to_sfe
-  #       StatelessFragmentDefaultActions:
-  #         - aws:forward_to_sfe
-  #       StatefulEngineOptions:
-  #         RuleOrder: STRICT_ORDER
-  #       StatefulDefaultActions:
-  #         - aws:drop_strict
-  #         - aws:alert_strict
-  #       StatefulRuleGroupReferences:
-  #         - Priority: 10
-  #           ResourceArn: !Ref inspectionFirewallRuleGroupAllowDomains
+  inspectionFirewallPolicy:
+    Type: AWS::NetworkFirewall::FirewallPolicy
+    Properties:
+      FirewallPolicyName: !Join
+        - '-'
+        - - anfw-policy
+          - !Ref AWS::StackName
+      Description: AWS Network Firewall policy
+      FirewallPolicy:
+        StatelessDefaultActions:
+          - aws:forward_to_sfe
+        StatelessFragmentDefaultActions:
+          - aws:forward_to_sfe
+        StatefulEngineOptions:
+          RuleOrder: STRICT_ORDER
+        StatefulDefaultActions:
+          - aws:drop_strict
+          - aws:alert_strict
+        StatefulRuleGroupReferences:
+          - Priority: 10
+            ResourceArn: !Ref inspectionFirewallRuleGroupAllowDomains
 
   inspectionFirewallRuleGroupAllowDomains:
-    Type: AWS::NetworkFirewall::Firewall::RuleGroup
+    Type: AWS::NetworkFirewall::RuleGroup
     Properties:
       RuleGroupName: !Join
         - '-'
@@ -2561,38 +2561,39 @@ Resources:
         StatefulRuleOptions:
           RuleOrder: STRICT_ORDER
 
-## Inject supernet routes for services CIDRs into VPC Route Tables
+#Inject supernet routes for services CIDRs into VPC Route Tables
+
   # 'Fn::ForEach::FirewallRoutes':
   #   - AvailabilityZone
   #   - ["1", "2"]
   #   - 'RouteEntryv4${AvailabilityZone}':
   #       Type: Custom::RouteTableEntry
-  #       DependsOn: FunctionLogGroup
+  #       DependsOn: injectorFunctionLogGroup
   #       Properties:
-  #         ServiceToken: !GetAtt FirewallRouteFunction.Arn
+  #         Version: v4
+  #         ServiceToken: !GetAtt injectorFirewallRouteFunction.Arn
   #         FirewallArn: !GetAtt inspectionFirewall.FirewallArn
   #         SubnetAz: !GetAtt 
-  #           - !Sub inspectionVPCPrivSub${AvailabilityZone}
+  #           - !Sub inspectionPrivSub${AvailabilityZone}
   #           - AvailabilityZone
-  #         DestinationCidr: !FindInMap [  VPCs, CIDRs, supernetv4 ]
+  #         DestinationCidr: !FindInMap [  Addressing, supernet, v4 ]
   #         RouteTableId: !Ref 
-  #           'Fn::Sub': 'inspectionTGWRouteTable${AvailabilityZone}'
+  #           'Fn::Sub': 'inspectionTgwRouteTable${AvailabilityZone}'
   #     'RouteEntryv6${AvailabilityZone}':
   #       Type: Custom::RouteTableEntry
-  #       DependsOn: FunctionLogGroup
+  #       DependsOn: injectorFunctionLogGroup
   #       Properties:
-  #         ServiceToken: !GetAtt FirewallRouteFunction.Arn
+  #         Version: v6
+  #         ServiceToken: !GetAtt injectorFirewallRouteFunction.Arn
   #         FirewallArn: !GetAtt inspectionFirewall.FirewallArn
   #         SubnetAz: !GetAtt 
-  #           - !Sub inspectionVPCPrivSub${AvailabilityZone}
+  #           - !Sub inspectionPrivSub${AvailabilityZone}
   #           - AvailabilityZone
-  #         DestinationCidr: !FindInMap [  VPCs, CIDRs, supernetv6 ]
+  #         DestinationCidr: !FindInMap [  Addressing, supernet, v6 ]
   #         RouteTableId: !Ref 
-  #           'Fn::Sub': 'inspectionTGWRouteTable${AvailabilityZone}'
+  #           'Fn::Sub': 'inspectionTgwRouteTable${AvailabilityZone}'
 
-## IAM Role (Lambda function)
-
-  # RouteFunctionRole:
+  # injectorRouteFunctionRole:
   #   Type: AWS::IAM::Role
   #   Properties:
   #     AssumeRolePolicyDocument:
@@ -2624,25 +2625,20 @@ Resources:
   #     ManagedPolicyArns:
   #       - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
-
-## CloudWach Log Group
-
-  # FunctionLogGroup:
+  # injectorFunctionLogGroup:
   #   Type: AWS::Logs::LogGroup
+  #   DependsOn: inspectionFirewall
   #   Properties:
-  #     LogGroupName: !Sub '/aws/lambda/${FirewallRouteFunction}'
+  #     LogGroupName: !Sub '/aws/lambda/${injectorFirewallRouteFunction}'
   #     RetentionInDays: 7
 
-
-## Lambda function
-
-  # FirewallRouteFunction:
+  # injectorFirewallRouteFunction:
   #   Type: AWS::Lambda::Function
   #   Properties:
   #     Description: Manage VPC routes to Network Firewall endpoints
-  #     Runtime: python3.9
+  #     Runtime: python3.12
   #     Timeout: 10
-  #     Role: !GetAtt RouteFunctionRole.Arn
+  #     Role: !GetAtt injectorRouteFunctionRole.Arn
   #     Handler: index.on_event
   #     Code:
   #       ZipFile: |-
@@ -2665,6 +2661,7 @@ Resources:
   #             }
 
   #         def create(event):
+  #             version: str = event["Version"]
   #             logical_id: str = event["LogicalResourceId"]
   #             request_id: str = event["RequestId"]
   #             physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
@@ -2672,14 +2669,23 @@ Resources:
   #             subnet_az = event["ResourceProperties"]["SubnetAz"]
   #             destination_cidr = event["ResourceProperties"]["DestinationCidr"]
   #             route_table_id = event["ResourceProperties"]["RouteTableId"]
-
   #             endpoints = get_data(firewall_arn)
-  #             ec2.create_route(
-  #                 DestinationCidrBlock=destination_cidr,
-  #                 RouteTableId=route_table_id,
-  #                 VpcEndpointId=endpoints[subnet_az],
-  #             )
-  #             return physical_resource_id
+              
+  #             if version == "v4":
+  #               ec2.create_route(
+  #                   DestinationCidrBlock=destination_cidr,
+  #                   RouteTableId=route_table_id,
+  #                   VpcEndpointId=endpoints[subnet_az],
+  #               )
+  #               return physical_resource_id
+              
+  #             elif version == "v6":
+  #               ec2.create_route(
+  #                   DestinationIpv6CidrBlock=destination_cidr,
+  #                   RouteTableId=route_table_id,
+  #                   VpcEndpointId=endpoints[subnet_az],
+  #               )
+  #               return physical_resource_id
 
   #         def update(event):
   #             logical_id: str = event["LogicalResourceId"]
@@ -2688,9 +2694,15 @@ Resources:
   #             return physical_resource_id
 
   #         def delete(event):
-  #             route_table_id = event["ResourceProperties"]["RouteTableId"]
-  #             destination_cidr = event["ResourceProperties"]["DestinationCidr"]
-  #             ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
+  #             version: str = event["version"]
+  #             if version == "v4":
+  #               route_table_id = event["ResourceProperties"]["RouteTableId"]
+  #               destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+  #               ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
+  #             elif version == "v6":
+  #               route_table_id = event["ResourceProperties"]["RouteTableId"]
+  #               destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+  #               ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
 
   #         def on_event(event, context):
   #           if event["RequestType"] == "Create":
