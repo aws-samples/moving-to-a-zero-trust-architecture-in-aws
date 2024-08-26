@@ -2600,6 +2600,7 @@ Resources:
         RulesSource:
           RulesString: |
             pass tcp any any <> $EXTERNAL_NET 443 (msg:"Allowing TCP on port 443"; flow:not_established; sid:892123; rev:1;)
+            pass tcp any any <> $EXTERNAL_NET 80 (msg:"Allowing TCP on port 80"; flow:not_established; sid:892124; rev:1;)
             pass http any any -> $EXTERNAL_NET 80 (msg:"Allowing HTTP on port 80"; sid:892125; rev:1;)
             pass tls any any -> $EXTERNAL_NET 443 (tls.sni; dotprefix; content:".amazon.com"; endswith; msg:"Allowing .amazon.com HTTPS requests"; sid:892126; rev:1;)
         StatefulRuleOptions:
