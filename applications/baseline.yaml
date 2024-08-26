@@ -1521,6 +1521,50 @@ Resources:
       RouteTableId: !Ref backEnd2PrivRouteTable2
       EgressOnlyInternetGatewayId: !Ref backEnd2Eogw
 
+  inspectionPrivPlatformRoute1v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachInspection
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref inspectionPrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+    
+  inspectionPrivPlatformRoute1v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachInspection
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref inspectionPrivRouteTable1
+      TransitGatewayId: !Ref regionalTgw
+
+  inspectionPrivPlatformRoute2v4:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachInspection
+    Properties:
+      DestinationCidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v4
+      RouteTableId: !Ref inspectionPrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+    
+  inspectionPrivPlatformRoute2v6:
+    Type: AWS::EC2::Route
+    DependsOn: regionalTgwAttachInspection
+    Properties:
+      DestinationIpv6CidrBlock: !FindInMap 
+        - Addressing
+        - supernet
+        - v6
+      RouteTableId: !Ref inspectionPrivRouteTable2
+      TransitGatewayId: !Ref regionalTgw
+
 ## Applications
 # Code Fetchers
 
@@ -2563,157 +2607,161 @@ Resources:
 
 #Inject supernet routes for services CIDRs into VPC Route Tables
 
-  # 'Fn::ForEach::FirewallRoutes':
-  #   - AvailabilityZone
-  #   - ["1", "2"]
-  #   - 'RouteEntryv4${AvailabilityZone}':
-  #       Type: Custom::RouteTableEntry
-  #       DependsOn: injectorFunctionLogGroup
-  #       Properties:
-  #         Version: v4
-  #         ServiceToken: !GetAtt injectorFirewallRouteFunction.Arn
-  #         FirewallArn: !GetAtt inspectionFirewall.FirewallArn
-  #         SubnetAz: !GetAtt 
-  #           - !Sub inspectionPrivSub${AvailabilityZone}
-  #           - AvailabilityZone
-  #         DestinationCidr: !FindInMap [  Addressing, supernet, v4 ]
-  #         RouteTableId: !Ref 
-  #           'Fn::Sub': 'inspectionTgwRouteTable${AvailabilityZone}'
-  #     'RouteEntryv6${AvailabilityZone}':
-  #       Type: Custom::RouteTableEntry
-  #       DependsOn: injectorFunctionLogGroup
-  #       Properties:
-  #         Version: v6
-  #         ServiceToken: !GetAtt injectorFirewallRouteFunction.Arn
-  #         FirewallArn: !GetAtt inspectionFirewall.FirewallArn
-  #         SubnetAz: !GetAtt 
-  #           - !Sub inspectionPrivSub${AvailabilityZone}
-  #           - AvailabilityZone
-  #         DestinationCidr: !FindInMap [  Addressing, supernet, v6 ]
-  #         RouteTableId: !Ref 
-  #           'Fn::Sub': 'inspectionTgwRouteTable${AvailabilityZone}'
+  'Fn::ForEach::FirewallRoutes':
+    - AvailabilityZone
+    - ["1", "2"]
+    - 'RouteEntryv4${AvailabilityZone}':
+        Type: Custom::RouteTableEntry
+        DependsOn: injectorFunctionLogGroup
+        Properties:
+          ServiceTimeout: 60
+          Version: v4
+          ServiceToken: !GetAtt injectorFirewallRouteFunction.Arn
+          FirewallArn: !GetAtt inspectionFirewall.FirewallArn
+          SubnetAz: !GetAtt 
+            - !Sub inspectionPrivSub${AvailabilityZone}
+            - AvailabilityZone
+          DestinationCidr: !FindInMap [  Addressing, supernet, v4 ]
+          RouteTableId: !Ref 
+            'Fn::Sub': 'inspectionTgwRouteTable${AvailabilityZone}'
+      'RouteEntryv6${AvailabilityZone}':
+        Type: Custom::RouteTableEntry
+        DependsOn: injectorFunctionLogGroup
+        Properties:
+          ServiceTimeout: 60
+          Version: v6
+          ServiceToken: !GetAtt injectorFirewallRouteFunction.Arn
+          FirewallArn: !GetAtt inspectionFirewall.FirewallArn
+          SubnetAz: !GetAtt 
+            - !Sub inspectionPrivSub${AvailabilityZone}
+            - AvailabilityZone
+          DestinationCidr: !FindInMap [  Addressing, supernet, v6 ]
+          RouteTableId: !Ref 
+            'Fn::Sub': 'inspectionTgwRouteTable${AvailabilityZone}'
 
-  # injectorRouteFunctionRole:
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Version: "2012-10-17"
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal:
-  #             Service:
-  #               - lambda.amazonaws.com
-  #           Action:
-  #             - sts:AssumeRole
-  #     Policies:
-  #       - PolicyName: AllowLambdaVPC
-  #         PolicyDocument:
-  #           Version: "2012-10-17"
-  #           Statement:
-  #             - Effect: Allow
-  #               Action:
-  #                 - ec2:CreateRoute
-  #                 - ec2:UpdateRoute
-  #                 - ec2:DeleteRoute
-  #               Resource:
-  #                 - !Sub arn:aws:ec2:*:*:route-table/*
-  #             - Effect: Allow
-  #               Action:
-  #                 - network-firewall:DescribeFirewall
-  #               Resource:
-  #                 - !GetAtt inspectionFirewall.FirewallArn
-  #     ManagedPolicyArns:
-  #       - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+  injectorRouteFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: AllowLambdaVPC
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateRoute
+                  - ec2:UpdateRoute
+                  - ec2:DeleteRoute
+                Resource:
+                  - !Sub arn:aws:ec2:*:*:route-table/*
+              - Effect: Allow
+                Action:
+                  - network-firewall:DescribeFirewall
+                Resource:
+                  - !GetAtt inspectionFirewall.FirewallArn
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
-  # injectorFunctionLogGroup:
-  #   Type: AWS::Logs::LogGroup
-  #   DependsOn: inspectionFirewall
-  #   Properties:
-  #     LogGroupName: !Sub '/aws/lambda/${injectorFirewallRouteFunction}'
-  #     RetentionInDays: 7
+  injectorFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    DependsOn: inspectionFirewall
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${injectorFirewallRouteFunction}'
+      RetentionInDays: 7
 
-  # injectorFirewallRouteFunction:
-  #   Type: AWS::Lambda::Function
-  #   Properties:
-  #     Description: Manage VPC routes to Network Firewall endpoints
-  #     Runtime: python3.12
-  #     Timeout: 10
-  #     Role: !GetAtt injectorRouteFunctionRole.Arn
-  #     Handler: index.on_event
-  #     Code:
-  #       ZipFile: |-
-  #         import logging
-  #         from typing import Dict
-  #         import boto3
-  #         import cfnresponse
+  injectorFirewallRouteFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Manage VPC routes to Network Firewall endpoints
+      Runtime: python3.12
+      Timeout: 20
+      Role: !GetAtt injectorRouteFunctionRole.Arn
+      Handler: index.on_event
+      Code:
+        ZipFile: |-
+          import logging
+          from typing import Dict
+          import boto3
+          import cfnresponse
 
-  #         logger = logging.getLogger(__name__)
+          logger = logging.getLogger(__name__)
 
-  #         nfw = boto3.client("network-firewall")
-  #         ec2 = boto3.client("ec2")
-  #         response = {}
+          nfw = boto3.client("network-firewall")
+          ec2 = boto3.client("ec2")
+          response = {}
 
-  #         def get_data(firewall_arn: str) -> Dict[str, str]:
-  #             response = nfw.describe_firewall(FirewallArn=firewall_arn)
-  #             return {
-  #                 k: v["Attachment"]["EndpointId"]
-  #                 for k, v in response["FirewallStatus"]["SyncStates"].items()
-  #             }
+          def get_data(firewall_arn: str) -> Dict[str, str]:
+              response = nfw.describe_firewall(FirewallArn=firewall_arn)
+              return {
+                  k: v["Attachment"]["EndpointId"]
+                  for k, v in response["FirewallStatus"]["SyncStates"].items()
+              }
 
-  #         def create(event):
-  #             version: str = event["Version"]
-  #             logical_id: str = event["LogicalResourceId"]
-  #             request_id: str = event["RequestId"]
-  #             physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
-  #             firewall_arn = event["ResourceProperties"]["FirewallArn"]
-  #             subnet_az = event["ResourceProperties"]["SubnetAz"]
-  #             destination_cidr = event["ResourceProperties"]["DestinationCidr"]
-  #             route_table_id = event["ResourceProperties"]["RouteTableId"]
-  #             endpoints = get_data(firewall_arn)
+          def create(event):
+              logical_id: str = event["LogicalResourceId"]
+              request_id: str = event["RequestId"]
+              physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
+              version: str = event["ResourceProperties"]["Version"]
+              firewall_arn = event["ResourceProperties"]["FirewallArn"]
+              subnet_az = event["ResourceProperties"]["SubnetAz"]
+              destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+              route_table_id = event["ResourceProperties"]["RouteTableId"]
+              endpoints = get_data(firewall_arn)
               
-  #             if version == "v4":
-  #               ec2.create_route(
-  #                   DestinationCidrBlock=destination_cidr,
-  #                   RouteTableId=route_table_id,
-  #                   VpcEndpointId=endpoints[subnet_az],
-  #               )
-  #               return physical_resource_id
+              if version == "v4":
+                ec2.create_route(
+                    DestinationCidrBlock=destination_cidr,
+                    RouteTableId=route_table_id,
+                    VpcEndpointId=endpoints[subnet_az],
+                )
+                return physical_resource_id
               
-  #             elif version == "v6":
-  #               ec2.create_route(
-  #                   DestinationIpv6CidrBlock=destination_cidr,
-  #                   RouteTableId=route_table_id,
-  #                   VpcEndpointId=endpoints[subnet_az],
-  #               )
-  #               return physical_resource_id
+              elif version == "v6":
+                ec2.create_route(
+                    DestinationIpv6CidrBlock=destination_cidr,
+                    RouteTableId=route_table_id,
+                    VpcEndpointId=endpoints[subnet_az],
+                )
+                return physical_resource_id
 
-  #         def update(event):
-  #             logical_id: str = event["LogicalResourceId"]
-  #             request_id: str = event["RequestId"]
-  #             physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
-  #             return physical_resource_id
+          def update(event):
+              logical_id: str = event["LogicalResourceId"]
+              request_id: str = event["RequestId"]
+              physical_resource_id = f'{logical_id}-{request_id.replace("-", "")}.txt'
+              return physical_resource_id
 
-  #         def delete(event):
-  #             version: str = event["version"]
-  #             if version == "v4":
-  #               route_table_id = event["ResourceProperties"]["RouteTableId"]
-  #               destination_cidr = event["ResourceProperties"]["DestinationCidr"]
-  #               ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
-  #             elif version == "v6":
-  #               route_table_id = event["ResourceProperties"]["RouteTableId"]
-  #               destination_cidr = event["ResourceProperties"]["DestinationCidr"]
-  #               ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
+          def delete(event):
+              version: str = event["ResourceProperties"]["Version"]
+              if version == "v4":
+                route_table_id = event["ResourceProperties"]["RouteTableId"]
+                destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+                ec2.delete_route(DestinationCidrBlock=destination_cidr, RouteTableId=route_table_id)
+              elif version == "v6":
+                route_table_id = event["ResourceProperties"]["RouteTableId"]
+                destination_cidr = event["ResourceProperties"]["DestinationCidr"]
+                ec2.delete_route(DestinationIpv6CidrBlock=destination_cidr, RouteTableId=route_table_id)
 
-  #         def on_event(event, context):
-  #           if event["RequestType"] == "Create":
-  #             physical_resource_id = create(event)
-  #             cfnresponse.send(event,context,cfnresponse.SUCCESS, {})
-  #             return
-  #           elif event["RequestType"] == "Update":
-  #             update(event),
-  #             cfnresponse.send(event,context, cfnresponse.SUCCESS, {})
-  #             return
-  #           elif event["RequestType"] == "Delete":
-  #             delete(event)
-  #             cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
-  #             return
+          def on_event(event, context):
+            print(event)
+            print(context)
+            if event["RequestType"] == "Create":
+              physical_resource_id = create(event)
+              cfnresponse.send(event,context,cfnresponse.SUCCESS, {})
+              return
+            elif event["RequestType"] == "Update":
+              update(event),
+              cfnresponse.send(event,context, cfnresponse.SUCCESS, {})
+              return
+            elif event["RequestType"] == "Delete":
+              delete(event)
+              cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+              return
