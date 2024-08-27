@@ -24,12 +24,12 @@ render = {}
 mservice1 = 'http://' + os.environ['DNSBackEnd1']
 mservice1sec = 'http://' + os.environ['DNSBackEnd1'] + '/secure'
 
-avaurl = 'https://public-keys.prod.verified-access.{REGION}.amazonaws.com/'
+avaurl = 'https://public-keys.prod.verified-access.' + os.environ['Region'] + '.amazonaws.com/'
 
 # Secure signer function
 def signer(endpoint):
   session = botocore.session.Session()
-  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', '{REGION}')
+  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', os.environ['Region'])
   endpoint = endpoint
   data = "null"
   headers = {}

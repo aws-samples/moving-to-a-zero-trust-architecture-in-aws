@@ -22,7 +22,7 @@ mservice2sec = 'http://' + os.environ['DNSBackEnd2'] + '/secure'
 
 def signer(endpoint):
   session = botocore.session.Session()
-  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', '{REGION}')
+  signer = SigV4Auth(session.get_credentials(), 'vpc-lattice-svcs', os.environ['Region'])
   endpoint = endpoint
   data = "null"
   headers = {}
