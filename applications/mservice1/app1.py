@@ -13,10 +13,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 # Define Variables
 mservice2 = 'http://' + os.environ['DNSBackEnd2']
 mservice2sec = 'http://' + os.environ['DNSBackEnd2'] + '/secure'
+logger.info(mservice2)
+logger.info(mservice2sec)
 
 # Secure signer function
 
@@ -91,14 +92,15 @@ def app1resp():
 @app.route("/secure", methods=['GET','POST'])
 def app1respsec():
     
-    try:    
+    try:
+        requestdata = request.json   
         headers = dict(request.headers)
 
     ## Comment out the below line when switching to signed requests
-        m2asecresp = requests.get(mservice2sec)
+        m2asecresp = requests.get(mservice2sec,json=requestdata)
     ## Uncomment the below line when switching to signed requests
         #prepped = signer(mservice2sec)
-        #m2asecresp = requests.get(prepped.url, headers=prepped.headers)
+        #m2asecresp = requests.get(prepped.url, headers=prepped.headers,json=requestdata)
             
         m2secpayload = json.loads(m2asecresp.content)
     

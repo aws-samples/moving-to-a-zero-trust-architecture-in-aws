@@ -23,8 +23,11 @@ render = {}
 
 mservice1 = 'http://' + os.environ['DNSBackEnd1']
 mservice1sec = 'http://' + os.environ['DNSBackEnd1'] + '/secure'
+logger.info(mservice1)
+logger.info(mservice1sec)
 
 avaurl = 'https://public-keys.prod.verified-access.' + os.environ['Region'] + '.amazonaws.com/'
+logger.info(avaurl)
 
 # Secure signer function
 def signer(endpoint):
@@ -178,10 +181,10 @@ def runapp():
   try:
     logger.info("Attempting connection to mservice1 secured endpoint")
   ## Comment out the below line when switching to signed requests
-    m1bresp = requests.get(mservice1sec)
+    m1bresp = requests.get(mservice1sec,json=portal)
   ## Uncomment the below two lines when switching to signed requests
-# prepped = signer(mservice1sec)
-# m1bresp = requests.get(prepped.url,headers=prepped.headers,json=portal)
+      # prepped = signer(mservice1sec)
+      # m1bresp = requests.get(prepped.url,headers=prepped.headers,json=portal)
 
     payload2 = json.loads(m1bresp.content)
     render2 = {
