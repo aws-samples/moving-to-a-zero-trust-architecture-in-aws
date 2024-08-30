@@ -23,11 +23,10 @@ render = {}
 
 mservice1 = 'http://' + os.environ['DNSBackEnd1']
 mservice1sec = 'http://' + os.environ['DNSBackEnd1'] + '/secure'
-logger.info(mservice1)
-logger.info(mservice1sec)
+# mservice1 = 'http://mservice1.885434427673.unicornpacket.com:80'
+# mservice1sec = 'http://mservice1.885434427673.unicornpacket.com:80/secure'
 
 avaurl = 'https://public-keys.prod.verified-access.' + os.environ['Region'] + '.amazonaws.com/'
-logger.info(avaurl)
 
 # Secure signer function
 def signer(endpoint):
@@ -62,9 +61,8 @@ def depacker(portal):
     
     #Get the payload
     payload = jwt.decode(encoded_jwt, pub_key, algorithms=['ES384'])
-  
     ptype   = os.path.join(img,'verifiedaccess.png')
-    pid     = os.path.join(img, payload['user']['user_name'] + '.png')
+    pid     = 'reinventuser.png'
     pidname = payload['user']['user_name']
 
   else:
@@ -126,8 +124,10 @@ def getBaselinePictures():
 
 @app.route('/run', methods=['GET','POST'])
 def runapp():
-
+  logging.info('Received request on "/run" path') 
+  logging.info('Depacking request headers to look for Auth') 
   portal = depacker(dict(request.headers))
+  logging.info('Depacked headers : ' + str(portal))
   
   portaldata = {
       'portalmessage'         : "Welcome to the Feline microservice portal",
@@ -139,7 +139,7 @@ def runapp():
   }
 
   try:
-    logger.info("Attempting connection to mservice1 unsecured endpoint")
+    logging.info('Making request to mservice1 on "/" path')
     m1aresp = requests.get(mservice1,json=portal)
     payload = json.loads(m1aresp.content)
 
@@ -160,7 +160,7 @@ def runapp():
     render.update(render1)
 
   except Exception as e:
-    logger.info("There was an issue connecting to mservice1 unsecured endpoint - error deatils: " + str(e))
+    logger.info("There was an issue connecting to mservice1 unsecured endpoint - error details: " + str(e))
 
     render1 = {
       'app1img'               : os.path.join(img,'wait.jpg'),
@@ -179,12 +179,12 @@ def runapp():
     render.update(render1)
 
   try:
-    logger.info("Attempting connection to mservice1 secured endpoint")
+    logging.info('Making request to mservice1 on "/secure" path')
   ## Comment out the below line when switching to signed requests
     m1bresp = requests.get(mservice1sec,json=portal)
   ## Uncomment the below two lines when switching to signed requests
-      # prepped = signer(mservice1sec)
-      # m1bresp = requests.get(prepped.url,headers=prepped.headers,json=portal)
+    # prepped = signer(mservice1sec)
+    # m1bresp = requests.get(prepped.url,headers=prepped.headers,json=portal)
 
     payload2 = json.loads(m1bresp.content)
     render2 = {
@@ -207,7 +207,7 @@ def runapp():
     render.update(render2)
 
   except Exception as e:
-    logger.info("There was an issue connecting to mservice1 secured endpoint - error deatils: " + str(e))
+    logger.info("There was an issue connecting to mservice1 secured endpoint - error details: " + str(e))
 
     render2 = {
       'app1secimg'            : os.path.join(img,'wait.jpg'),

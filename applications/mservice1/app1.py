@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 # Define Variables
 mservice2 = 'http://' + os.environ['DNSBackEnd2']
 mservice2sec = 'http://' + os.environ['DNSBackEnd2'] + '/secure'
-logger.info(mservice2)
-logger.info(mservice2sec)
+# mservice2 = 'http://mservice2.885434427673.unicornpacket.com:80'
+# mservice2sec = 'http://mservice2.885434427673.unicornpacket.com:80/secure'
 
 # Secure signer function
 
@@ -38,8 +38,10 @@ app = Flask(__name__)
 @app.route("/",  methods=['GET'])
 def app1resp():
 
-    try:    
+    try:
+        logging.info('Received request on "/" path')    
         requestdata = request.json
+        logging.info('Making request to mservice2 on "/" path') 
         m2aresp = requests.get(mservice2,json=requestdata)
         m2payload = json.loads(m2aresp.content)
 
@@ -69,7 +71,6 @@ def app1resp():
     
     except Exception as e:
         logger.info(e)
-
         data = {
             'app1headers'       :   '',
             'app1url'           :   '',
@@ -93,9 +94,11 @@ def app1resp():
 def app1respsec():
     
     try:
+        logging.info('Received request on "/secure" path') 
         requestdata = request.json   
         headers = dict(request.headers)
 
+        logging.info('Making request to mservice2 on "/secure" path')
     ## Comment out the below line when switching to signed requests
         m2asecresp = requests.get(mservice2sec,json=requestdata)
     ## Uncomment the below line when switching to signed requests
