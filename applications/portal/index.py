@@ -23,9 +23,6 @@ render = {}
 
 mservice1 = 'http://' + os.environ['DNSBackEnd1']
 mservice1sec = 'http://' + os.environ['DNSBackEnd1'] + '/secure'
-# mservice1 = 'http://mservice1.885434427673.unicornpacket.com:80'
-# mservice1sec = 'http://mservice1.885434427673.unicornpacket.com:80/secure'
-
 avaurl = 'https://public-keys.prod.verified-access.' + os.environ['Region'] + '.amazonaws.com/'
 
 # Secure signer function
@@ -43,12 +40,14 @@ def signer(endpoint):
 
 # AVA depacker function
 def depacker(portal):
-  
+  logging.info('Portal is: ' + str(portal))
   if "X-Amzn-Ava-User-Context" in portal:
 
     #Decode the headers
     encoded_jwt = portal['X-Amzn-Ava-User-Context']
     jwt_headers = encoded_jwt.split('.')[0]
+    jwt_headers += '=='
+    logging.info('JWT headers are: ' + str(jwt_headers))
     decoded_jwt_headers = base64.b64decode(jwt_headers)
     decoded_jwt_headers = decoded_jwt_headers.decode("utf-8")
     decoded_json = json.loads(decoded_jwt_headers)
@@ -61,9 +60,10 @@ def depacker(portal):
     
     #Get the payload
     payload = jwt.decode(encoded_jwt, pub_key, algorithms=['ES384'])
+    logging.info('Payload is: ' + str(payload))
     ptype   = os.path.join(img,'verifiedaccess.png')
-    pid     = 'reinventuser.png'
-    pidname = payload['user']['user_name']
+    pid     = os.path.join(img,'reinventuser.png')
+    pidname = payload['username']
 
   else:
     ptype = os.path.join(img, 'clientvpn.png')
