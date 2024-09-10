@@ -14,10 +14,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Define Variables
-mservice2 = 'http://' + os.environ['DNSBackEnd2']
-mservice2sec = 'http://' + os.environ['DNSBackEnd2'] + '/secure'
-# mservice2 = 'http://mservice2.885434427673.unicornpacket.com:80'
-# mservice2sec = 'http://mservice2.885434427673.unicornpacket.com:80/secure'
+mservice2 = 'https://' + os.environ['DNSBackEnd2']
+mservice2sec = 'https://' + os.environ['DNSBackEnd2'] + '/secure'
 
 # Secure signer function
 

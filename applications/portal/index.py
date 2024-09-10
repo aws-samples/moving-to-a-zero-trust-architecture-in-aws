@@ -21,8 +21,8 @@ img = os.path.join('static','images')
 global portal
 render = {}
 
-mservice1 = 'http://' + os.environ['DNSBackEnd1']
-mservice1sec = 'http://' + os.environ['DNSBackEnd1'] + '/secure'
+mservice1 = 'https://' + os.environ['DNSBackEnd1']
+mservice1sec = 'https://' + os.environ['DNSBackEnd1'] + '/secure'
 avaurl = 'https://public-keys.prod.verified-access.' + os.environ['Region'] + '.amazonaws.com/'
 
 # Secure signer function
