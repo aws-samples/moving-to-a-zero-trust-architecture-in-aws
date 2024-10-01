@@ -33,6 +33,10 @@ This example requires the use of 3 AWS Accounts: one for the central Networking 
 * This repository does not configure AWS Identity Center. Check the [documentation](https://docs.aws.amazon.com/singlesignon/latest/userguide/tutorials.html) to understand how to enable it in your AWS Accounts (if not done already).
 * Terraform installed.
 
+## Signing Assertion
+
+For enhanced security in your deployment, you should add code signing assertion to requests made by AWS Verified Access to your back-end applications. To implement this, simply modify the code signing entity **Authsigner** component within [index.py](./applications/portal/index.py) and then enforce assertion of the expected value within the **depacker()** function. An example of this signing assertion can be seen in the [AWS documentaion](https://docs.aws.amazon.com/verified-access/latest/ug/user-claims-passing.html#sample-code)
+
 ## Code Principles
 
 * Writing DRY (Do No Repeat Yourself) code using a modular design pattern.
