@@ -35,7 +35,7 @@ This example requires the use of 3 AWS Accounts: one for the central Networking 
 
 ## Signing Assertion
 
-For enhanced security in your deployment, you should add code signing assertion to requests made by AWS Verified Access to your back-end applications. To implement this, simply modify the code signing entity **Authsigner** component within [index.py](./applications/portal/index.py) and then enforce assertion of the expected value within the **depacker()** function. An example of this signing assertion can be seen in the [AWS documentaion](https://docs.aws.amazon.com/verified-access/latest/ug/user-claims-passing.html#sample-code)
+For enhanced security in your deployment, you should add code signing assertion to requests made by AWS Verified Access to your back-end applications. To implement this, simply modify the code signing entity **Authsigner** component within [index.py](./applications/portal/index.py) and then enforce assertion of the expected value within the **depacker()** function. An example of this signing assertion can be seen in the [AWS documentation](https://docs.aws.amazon.com/verified-access/latest/ug/user-claims-passing.html#sample-code)
 
 ## Code Principles
 
