@@ -30,7 +30,7 @@ avaurl = 'https://public-keys.prod.verified-access.{REGION}.amazonaws.com/'
 ## For increased security, you should validate the signing entity for requests made to your application ##
 ## To do that, replace the value below for the 'authsigner' with the verified access instanceID which   ##
 ## takes the format 'arn:aws:ec2:region:111111111111:verified-access-instance/vai-abcd12345efghij89'    ##
-## following this, uncomment line #65 to assert the value                                               ##
+## following this, uncomment line #64 to assert the value                                               ##
 ## ---------------------------------------- security notice ------------------------------------------- ##
 
 authsigner = 'arn:aws:ec2:region:accountid:verified-access-instance/instanceid'
