@@ -24,7 +24,6 @@ render = {}
 mservice1 = 'https://' + os.environ['DNSBackEnd1']
 mservice1sec = 'https://' + os.environ['DNSBackEnd1'] + '/secure'
 avaurl = 'https://public-keys.prod.verified-access.' + os.environ['Region'] + '.amazonaws.com/'
-authsigner = 'arn:aws:ec2:' + os.environ['Region'] + ':' + os.environ['Account'] + ':verified-access-instance'
 
 # Secure signer function
 def signer(endpoint):
@@ -52,9 +51,6 @@ def depacker(portal):
     decoded_json = json.loads(decoded_jwt_headers)
     logging.info('JWT Headers: ' + str(decoded_json))
     kid = decoded_json['kid']
-
-    # Assert the signer is Amazon Verified Access from from within the same acount
-    assert authsigner in decoded_json['signer']
     
     #Get the public key
     url = avaurl + kid
@@ -86,15 +82,7 @@ app = Flask(__name__)
 @app.route('/', methods=['GET'])
 def getBaselinePictures():
   
-  try: 
-    portal = depacker(dict(request.headers))
-  except Exception as e:
-    logger.info("There was an issue depacking the authentication headers - error details: " + str(e))
-    portal = {
-      "portaltype"    : os.path.join(img,'verifiedaccess.png'),
-      "portalid"      : os.path.join(img, 'mrx.png'),
-      "portalidname"  : "Anonymous"
-    }
+  portal = depacker(dict(request.headers))
 
   render = {
     "app1img"               : os.path.join(img,'wait.jpg'),
@@ -137,18 +125,8 @@ def getBaselinePictures():
 def runapp():
   logging.info('Received request on "/run" path') 
   logging.info('Depacking request headers to look for Auth') 
-  
-  try: 
-    portal = depacker(dict(request.headers))
-    logging.info('Depacked headers : ' + str(portal))
-  
-  except Exception as e:
-    logger.info("There was an issue depacking the authentication headers - error details: " + str(e))
-    portal = {
-      "portaltype"    : os.path.join(img,'verifiedaccess.png'),
-      "portalid"      : os.path.join(img, 'mrx.png'),
-      "portalidname"  : "Anonymous"
-    }
+  portal = depacker(dict(request.headers))
+  logging.info('Depacked headers : ' + str(portal))
   
   portaldata = {
       'portalmessage'         : "Welcome to the Feline microservice portal",
